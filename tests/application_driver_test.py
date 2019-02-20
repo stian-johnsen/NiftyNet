@@ -24,7 +24,8 @@ from niftynet.engine.signal import SESS_FINISHED, SESS_STARTED
 def get_initialised_driver(starting_iter=0,
                            model_dir_rand=True,
                            vars_to_restore='',
-                           application='tests.toy_application.ToyApplication'):
+                           application='tests.toy_application.ToyApplication',
+                           use_gradient_checkpoints=False):
     if model_dir_rand:
         model_dir = os.path.join('.', 'testing_data', 'tmp', str(uuid.uuid4()))
         os.makedirs(model_dir)
@@ -55,61 +56,10 @@ def get_initialised_driver(starting_iter=0,
             max_checkpoints=20,
             optimiser='niftynet.engine.application_optimiser.Adagrad',
             validation_every_n=-1,
+            gradient_checkpointing=use_gradient_checkpoints,
             exclude_fraction_for_validation=0.1,
             exclude_fraction_for_inference=0.1,
             vars_to_restore=vars_to_restore,
-            lr=0.01),
-        'CUSTOM': ParserNamespace(
-            vector_size=100,
-            mean=10.0,
-            stddev=2.0,
-            name=application)
-    }
-    app_driver = ApplicationDriver()
-    app_driver.initialise_application(system_param, {})
-    # set parameters without __init__
-    app_driver.app.action_param = system_param['TRAINING']
-    app_driver.app.net_param = system_param['NETWORK']
-    app_driver.app.action = 'train'
-    return app_driver
-
-
-def get_gradient_checkpointing_driver(use_gradient_checkpts=False):
-    application = 'tests.toy_application.ToyApplication'
-    if model_dir_rand:
-        model_dir = os.path.join('.', 'testing_data', 'tmp', str(uuid.uuid4()))
-        os.makedirs(model_dir)
-    else:
-        model_dir = os.path.join('.', 'testing_data')
-    system_param = {
-        'SYSTEM': ParserNamespace(
-            action='train',
-            num_threads=1,
-            num_gpus=0,
-            cuda_devices='-1',
-            model_dir=model_dir,
-            dataset_split_file=os.path.join(
-                '.', 'testing_data', 'testtoyapp.csv'),
-            event_handler=[
-                'niftynet.engine.handler_model.ModelRestorer',
-                'niftynet.engine.handler_sampler.SamplerThreading',
-                'niftynet.engine.handler_gradient.ApplyGradients'],
-            iteration_generator=None),
-        'NETWORK': ParserNamespace(
-            batch_size=20,
-            name='tests.toy_application.TinyNet'),
-        'TRAINING': ParserNamespace(
-            starting_iter=starting_iter,
-            max_iter=2,
-            save_every_n=-1,
-            tensorboard_every_n=1,
-            max_checkpoints=20,
-            optimiser='niftynet.engine.application_optimiser.Adagrad',
-            validation_every_n=-1,
-            gradient_checkpointing=use_gradient_checkpts,
-            exclude_fraction_for_validation=0,
-            exclude_fraction_for_inference=0,
-            vars_to_restore=[],
             lr=0.01),
         'CUSTOM': ParserNamespace(
             vector_size=100,
@@ -162,55 +112,17 @@ class ApplicationDriverTest(tf.test.TestCase):
 
     def test_gradient_checkpointing(self):
         try:
-            import memory_saving_gradients
+            import memory_saving_gradients as msg
 
-            def _compute_footprint(use_checkpointing):
-                tf.reset_default_graph()
+            tf_gradients = tf.__dict__['gradients']
+            test_driver = get_initialised_driver(
+                use_gradient_checkpoints=False)
+            self.assertTrue(tf.__dict__['gradients'] != msg.gradients_memory)
 
-                test_driver = get_gradient_checkpointing_driver(
-                    use_gradient_checkpts=use_checkpointing)
-                graph = test_driver.create_graph(test_driver.app, 0, 1, True)
-
-                with self.test_session(graph=graph, use_gpu=False) as sess:
-                    SESS_STARTED.send(test_driver.app, iter_msg=None)
-
-                    # Footprint calc mostly based on tests/mem_util.py from
-                    # gradient_checkpointing
-
-                    metadata = tf.RunMetadata()
-                    result = sess.run(test_driver.app.gradient_op,
-                                      options=tf.RunOptions(
-                                          trace_level=tf.RunOptions.FULL_TRACE),
-                                      run_metadata=metadata)
-
-                    sess.run(test_driver.app.gradient_op)
-                    SESS_FINISHED.send(test_driver.app, itermsg=None)
-                    test_driver.app.stop()
-
-                    for dev_stat in metadata.step_stats.dev_stats:
-                        if dev_stat.device.split('/')[-1].endswith('CPU:0'):
-                            mems = [node.memory for node in dev_stat.node_stats]
-                            peak = 0
-                            for mem in mems:
-                                if mem:
-                                    try:
-                                        for recs in [smem.allocation_records
-                                                     for smem in mem]:
-                                            peak = max(peak, max(
-                                                rec.alloc_bytes
-                                                for rec in recs))
-                                    except:
-                                        pass
-
-                            return peak
-
-                    raise RuntimeError('Could not get memory allocation.')
-
-            nonckpt_footprint = _compute_footprint(False)
-            ckpt_footprint = _compute_footprint(True)
-
-            print((nonckpt_footprint, ckpt_footprint))
-            self.assertGreater(nonckpt_footprint, ckpt_footprint)
+            test_driver = get_initialised_driver(
+                use_gradient_checkpoints=True)
+            self.assertTrue(tf.__dict__['gradients'] == msg.gradients_memory)
+            tf.__dict__['gradients'] = tf_gradients
         except ImportError:
             tf.logging.info('Gradient-checkpointing module could not be loaded;'
                             ' proceeding without testing')
