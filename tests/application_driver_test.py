@@ -74,6 +74,48 @@ def get_initialised_driver(starting_iter=0,
     return app_driver
 
 
+def get_gradient_checkpointing_driver(do_checkpoint=False):
+    model_dir = os.path.join('.', 'testing_data')
+    system_param = {
+        'SYSTEM': ParserNamespace(
+            action='train',
+            num_threads=1,
+            num_gpus=0,
+            cuda_devices='0',
+            model_dir=model_dir,
+            dataset_split_file=os.path.join(
+                '.', 'testing_data', 'testtoyapp.csv'),
+            event_handler=[
+                'niftynet.engine.handler_model.ModelRestorer',
+                'niftynet.engine.handler_sampler.SamplerThreading',
+                'niftynet.engine.handler_gradient.ApplyGradients'],
+            iteration_generator=None),
+        'NETWORK': ParserNamespace(
+            batch_size=20,
+            name='niftynet.'),
+        'TRAINING': ParserNamespace(
+            starting_iter=0,
+            max_iter=10,
+            save_every_n=-1,
+            tensorboard_every_n=-1,
+            gradient_checkpointing=do_checkpoint,
+            max_checkpoints=20,
+            optimiser='niftynet.engine.application_optimiser.Adam',
+            validation_every_n=-1,
+            exclude_fraction_for_validation=0.0,
+            exclude_fraction_for_inference=0.0,
+            vars_to_restore=[],
+            lr=0.01),
+        'CUSTOM': None
+    }
+    app_driver = ApplicationDriver()
+    app_driver.initialise_application(system_param, {})
+    app_driver.app.action_param = system_param['TRAINING']
+    app_driver.app.net_param = system_param['NETWORK']
+    app_driver.app.action = 'train'
+    return app_driver
+
+
 class ApplicationDriverTest(tf.test.TestCase):
     def test_wrong_init(self):
         app_driver = ApplicationDriver()
@@ -107,6 +149,52 @@ class ApplicationDriverTest(tf.test.TestCase):
     #         except tf.errors.OutOfRangeError:
     #             for thread in test_driver.app.sampler[0][0]._threads:
     #                 self.assertFalse(thread.isAlive(), "threads not closed")
+
+    def test_gradient_checkpointing(self):
+        try:
+            import memory_saving_gradients
+
+            def _compute_footprint(use_checkpointing):
+                tf.reset_default_graph()
+
+                test_driver = get_gradient_checkpointing_driver(
+                    use_checkpointing)
+                graph = test_driver.create_graph(test_driver.app, 0, 1, True)
+
+                with self.test_session(graph=graph, use_gpu=False) as sess:
+                    SESS_STARTED.send(test_driver.app, iter_msg=None)
+
+                    # Footprint calc mostly based on tests/mem_util.py from
+                    # gradient_checkpointing
+
+                    metadata = tf.RunMetadata()
+                    result = sess.run(test_driver.app.gradient_op
+                                      options=tf.RunOptions(
+                                          trace_level=tf.RunOptions.FULL_TRACE),
+                                      run_metadata=metadata)
+
+                    sess.run(test_driver.app.gradient_op)
+                    SESS_FINISHED.send(test_driver.app, itermsg=None)
+                    test_driver.app.stop()
+
+                    dev_stats = run_metadata.step_stats.dev_stats
+                    for dev_stat in dev_stats:
+                        print(dev_stat.device)
+                        if dev_stat.device == '/cpu:0':
+                            peak = max(rec.alloc_bytes
+                                       for rec in mem.allocation_records
+                                       for mem in node.memory
+                                       for node in dev_stat.nodestats)
+
+                            return peak
+
+            nonckpt_footprint = _compute_footprint(False)
+            ckpt_footprint = _compute_footprint(True)
+
+            self.assertGreater(nonckpt_footprint, ckpt_footprint)
+        except ImportError:
+            tf.logging.info('Gradient-checkpointing module could not be loaded;'
+                            ' proceeding without testing')
 
     def test_training_update(self):
         test_driver = get_initialised_driver()
