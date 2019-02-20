@@ -57,7 +57,6 @@ class ApplicationDriver(object):
         self.save_every_n = 0
         self.tensorboard_every_n = -1
         self.vars_to_restore = ''
-        self.use_gradient_ckpt = False
 
         self.initial_iter = 0
         self.final_iter = 0
@@ -109,7 +108,6 @@ class ApplicationDriver(object):
             self.final_iter = max(train_param.max_iter, self.initial_iter)
             self.save_every_n = train_param.save_every_n
             self.tensorboard_every_n = train_param.tensorboard_every_n
-            self.use_gradient_ckpt = train_param.gradient_checkpointing
             self.max_checkpoints = max(self.max_checkpoints,
                                        train_param.max_checkpoints)
             self.validation_every_n = train_param.validation_every_n
@@ -123,6 +121,19 @@ class ApplicationDriver(object):
             assert infer_param, 'inference parameters not specified'
             self.initial_iter = infer_param.inference_iter
             action_param = infer_param
+
+        # Switch on gradient-checkpointing if requested and supported
+        if train_param and train_param.gradient_checkpointing:
+            try:
+                import memory_saving_gradients
+                tf.__dict__['gradients'] \
+                    = memory_saving_gradients.gradients_memory
+                tf.logging.info('Using memory saving gradients.')
+            except ImportError:
+                tf.logging('Gradient checkpointing module is unavailable,'
+                           'despite checkpointing being requested by the user.'
+                           'Please install it using "pip install -r '
+                           'requirements-gradient-checkpointing.txt"')
 
         # infer the initial iteration from model files
         if self.initial_iter < 0:
@@ -192,17 +203,6 @@ class ApplicationDriver(object):
 
         start_time = time.time()
         loop_status = {'current_iter': self.initial_iter, 'normal_exit': False}
-
-        if self.use_gradient_ckpt:
-            try:
-                import memory_saving_gradients as tf_msg
-                tf.__dict__['gradients'] = tf_msg.gradients_memory
-                tf.logging.debug('Using memory saving gradients.')
-            except ImportError:
-                tf.logging('Gradient checkpointing module is unavailable,'
-                           'despite checkpointing being requested by the user.'
-                           'Please install it using "pip install -r '
-                           'requirements-gradient-checkpointing.txt"')
 
         with tf.Session(config=tf_config(), graph=graph):
             try:
