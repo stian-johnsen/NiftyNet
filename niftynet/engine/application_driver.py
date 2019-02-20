@@ -132,9 +132,7 @@ class ApplicationDriver(object):
             except ImportError:
                 tf.logging.error('Gradient checkpointing module is unavailable,'
                                  'despite checkpointing being requested by '
-                                 'the user.'
-                                 'Please install it using "pip install -r '
-                                 'requirements-gradient-checkpointing.txt"')
+                                 'the user.')
 
         # infer the initial iteration from model files
         if self.initial_iter < 0:
