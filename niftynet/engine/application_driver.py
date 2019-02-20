@@ -130,10 +130,11 @@ class ApplicationDriver(object):
                     = memory_saving_gradients.gradients_memory
                 tf.logging.info('Using memory saving gradients.')
             except ImportError:
-                tf.logging('Gradient checkpointing module is unavailable,'
-                           'despite checkpointing being requested by the user.'
-                           'Please install it using "pip install -r '
-                           'requirements-gradient-checkpointing.txt"')
+                tf.logging.error('Gradient checkpointing module is unavailable,'
+                                 'despite checkpointing being requested by '
+                                 'the user.'
+                                 'Please install it using "pip install -r '
+                                 'requirements-gradient-checkpointing.txt"')
 
         # infer the initial iteration from model files
         if self.initial_iter < 0:
