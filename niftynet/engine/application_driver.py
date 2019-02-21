@@ -126,6 +126,13 @@ class ApplicationDriver(object):
         if train_param and train_param.gradient_checkpointing:
             try:
                 import memory_saving_gradients
+                from tensorflow.python.ops import gradients
+                from tensorflow.python.ops import gradients_impl
+                gradients_impl.__dict__['gradients'] \
+                    = memory_saving_gradients.gradients_memory
+                def gradients_memory(ys, xs, grad_ys=None, **kwargs):
+                    return memory_saving_gradients.gradients(ys, xs, grad_ys, checkpoints='memory', **kwargs)
+                gradients.__dict__["gradients"] = gradients_memory
                 tf.__dict__['gradients'] \
                     = memory_saving_gradients.gradients_memory
                 tf.logging.info('Using memory saving gradients.')
