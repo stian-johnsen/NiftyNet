@@ -451,12 +451,6 @@ def add_training_args(parser):
         default=1)
 
     parser.add_argument(
-        "--gradient_checkpointing",
-        help="Indicates if gradient check-pointing should be applied",
-        type=str2boolean,
-        default=False)
-
-    parser.add_argument(
         "--rotation_angle",
         help="The min/max angles of rotation when rotation "
              "augmentation is enabled",

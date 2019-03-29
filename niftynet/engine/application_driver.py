@@ -122,24 +122,6 @@ class ApplicationDriver(object):
             self.initial_iter = infer_param.inference_iter
             action_param = infer_param
 
-        # Switch on gradient-checkpointing if requested and supported
-        if train_param and train_param.gradient_checkpointing:
-            try:
-                import memory_saving_gradients
-                from tensorflow.python.ops import gradients
-                from tensorflow.python.ops import gradients_impl
-                gradients_impl.__dict__['gradients'] \
-                    = memory_saving_gradients.gradients_memory
-                gradients.__dict__["gradients"] \
-                    = memory_saving_gradients.gradients_memory
-                tf.__dict__['gradients'] \
-                    = memory_saving_gradients.gradients_memory
-                tf.logging.info('Using memory saving gradients.')
-            except ImportError:
-                tf.logging.error('Gradient checkpointing module is unavailable,'
-                                 'despite checkpointing being requested by '
-                                 'the user.')
-
         # infer the initial iteration from model files
         if self.initial_iter < 0:
             self.initial_iter = infer_latest_model_file(

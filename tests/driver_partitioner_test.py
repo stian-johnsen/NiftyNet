@@ -32,7 +32,6 @@ def _generate_base_params():
         max_iter=2,
         save_every_n=2,
         tensorboard_every_n=0,
-        gradient_checkpointing=False,
         max_checkpoints=100)
 
     user_param['INFERENCE'] = ParserNamespace(

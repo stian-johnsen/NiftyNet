@@ -24,8 +24,7 @@ from niftynet.engine.signal import SESS_FINISHED, SESS_STARTED
 def get_initialised_driver(starting_iter=0,
                            model_dir_rand=True,
                            vars_to_restore='',
-                           application='tests.toy_application.ToyApplication',
-                           use_gradient_checkpoints=False):
+                           application='tests.toy_application.ToyApplication'):
     if model_dir_rand:
         model_dir = os.path.join('.', 'testing_data', 'tmp', str(uuid.uuid4()))
         os.makedirs(model_dir)
@@ -56,7 +55,6 @@ def get_initialised_driver(starting_iter=0,
             max_checkpoints=20,
             optimiser='niftynet.engine.application_optimiser.Adagrad',
             validation_every_n=-1,
-            gradient_checkpointing=use_gradient_checkpoints,
             exclude_fraction_for_validation=0.1,
             exclude_fraction_for_inference=0.1,
             vars_to_restore=vars_to_restore,
@@ -109,23 +107,6 @@ class ApplicationDriverTest(tf.test.TestCase):
     #         except tf.errors.OutOfRangeError:
     #             for thread in test_driver.app.sampler[0][0]._threads:
     #                 self.assertFalse(thread.isAlive(), "threads not closed")
-
-    def test_gradient_checkpointing(self):
-        try:
-            import memory_saving_gradients as msg
-
-            tf_gradients = tf.__dict__['gradients']
-            test_driver = get_initialised_driver(
-                use_gradient_checkpoints=False)
-            self.assertTrue(tf.__dict__['gradients'] != msg.gradients_memory)
-
-            test_driver = get_initialised_driver(
-                use_gradient_checkpoints=True)
-            self.assertTrue(tf.__dict__['gradients'] == msg.gradients_memory)
-            tf.__dict__['gradients'] = tf_gradients
-        except ImportError:
-            tf.logging.info('Gradient-checkpointing module could not be loaded;'
-                            ' proceeding without testing')
 
     def test_training_update(self):
         test_driver = get_initialised_driver()
