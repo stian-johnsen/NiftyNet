@@ -88,12 +88,20 @@ class ConvLayer(TrainableLayer):
             'w', shape=w_full_size,
             initializer=self.initializers['w'],
             regularizer=self.regularizers['w'])
-        output_tensor = tf.nn.convolution(input=input_tensor,
-                                          filter=conv_kernel,
-                                          strides=full_stride,
-                                          dilation_rate=full_dilation,
-                                          padding=self.padding,
-                                          name='conv')
+        if self.padding in ('VALID', 'SAME'):
+            output_tensor = tf.nn.convolution(input=input_tensor,
+                                              filter=conv_kernel,
+                                              strides=full_stride,
+                                              dilation_rate=full_dilation,
+                                              padding=self.padding,
+                                              name='conv')
+        else:
+            output_tensor = _extended_convolution(input_tensor,
+                                                  conv_kernel,
+                                                  full_stride,
+                                                  full_dilation,
+                                                  self.padding)
+
         if not self.with_bias:
             return output_tensor
 
@@ -238,6 +246,7 @@ def _compute_pad_size(input_dim_size, output_dim_size, kernel_dim_size,
     return ((output_dim_size - 1)*stride + (kernel_dim_size - 1)*dilation + 2
             - input_dim_size)//2
 
+
 def _extended_convolution(input_tensor, kernel, strides, dilations, padding,
                           name='extended_convolution'):
     """
@@ -309,8 +318,8 @@ def _extended_convolution(input_tensor, kernel, strides, dilations, padding,
         dim_idcs = np.arange(pad[d], input_shape[d] + pad[d])
         padding_indices[...,d] = np.tile(dim_idcs, tile_factors)
 
-
     extractor = ResamplerLayer(interpolation='NEAREST',
                                boundary=padding,
                                name='conv_extract_' + name)
+
     return extractor(conv_output, tf.constant(extraction_indices))
