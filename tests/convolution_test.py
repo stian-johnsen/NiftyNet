@@ -56,6 +56,30 @@ class ConvTest(tf.test.TestCase):
             output_value = sess.run(output_data)
             self.assertAllClose(output_shape, output_value.shape)
 
+    def _test_extended_conv(self, enlarged_input, orig_input, init_dict,
+                            pad_offsets):
+        conv_layer = ConvolutionalLayer(init_dict)
+        small_output = conv_layer(orig_input)
+
+        conv_layer.padding = 'SAME'
+        large_output = conv_layer(enlarged_input)
+
+        with self.test_session() as sess:
+            small_value = sess.run(small_output)
+            large_value = sess.run(large_output)
+
+            extr_slices = [slice(None)]
+            for d in range(len(pad_offsets)):
+                extr_slices.append(slice(pad_offsets[d],
+                                         pad_offsets[d]
+                                         + small_value.shape[1+d]))
+
+            while len(extr_slices) < len(small_value.shape):
+                extr_slices.append(slice(None))
+
+            extr_value = large_value[extr_slices]
+            self.assertAllClose(small_value, extr_value)
+
     # 3d tests
     def test_3d_conv_default_shape(self):
         input_param = {'n_output_chns': 10,
