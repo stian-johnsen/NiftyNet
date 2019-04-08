@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, print_function
 
+import copy
 import numpy as np
 import tensorflow as tf
 
@@ -10,8 +11,13 @@ from niftynet.layer.base_layer import TrainableLayer
 from niftynet.layer.bn import BNLayer
 from niftynet.layer.gn import GNLayer
 from niftynet.utilities.util_common import look_up_operations
+# If and when niftynet.contrib.layer.resampler_optional_niftyreg is merged
+# replace w/ ResamplerOptionalNiftyRegLayer or better yet
+# NiftyregImageResamplingLayer
+import niftynet.layer.resampler as resampler
+from niftynet.layer.resampler import ResamplerLayer
 
-SUPPORTED_PADDING = set(['SAME', 'VALID'])
+SUPPORTED_PADDING = set(['SAME', 'VALID', 'REPLICATE', 'SYMMETRIC'])
 
 
 def default_w_initializer():
@@ -220,3 +226,91 @@ class ConvolutionalLayer(TrainableLayer):
             output_tensor = activation(conv_layer(input_tensor))
 
         return output_tensor
+
+
+def _compute_pad_size(input_dim_size, output_dim_size, kernel_dim_size,
+                      stride, dilation):
+    """
+    Computes the size of the pad using the formula given in TF's conv_ops.cc.
+    :return: the one-sided pad size
+    """
+
+    return ((output_dim_size - 1)*stride + (kernel_dim_size - 1)*dilation + 2
+            - input_dim_size)//2
+
+def _extended_convolution(input_tensor, kernel, strides, dilations, padding,
+                          name='extended_convolution'):
+    """
+    A simple wrapper for tf.nn.convolution that first expands the input tensor
+    by sampling at discrete locations in the original tensor then invokes
+    the original convolution operation on the expanded tensor, and finally
+    extracts a suitable output tensor from the output of the convolution of
+    the expanded tensor.
+    :param input_tensor: original convolution input tensor
+    :param kernel: convolution kernel
+    :param strides: strided convolution strides (one per spatial dimension)
+    :param dilations: dilated convolution dilation factors
+    (one per spatial dimension)
+    :param padding: a string specifying the type of padding to apply
+    :param name: a name for the operation
+    :return: a convolution result of the same size as the input tensor
+    """
+
+    input_shape = input_tensor.shape.as_list()
+    kernel_shape = kernel.shape.as_list()
+
+    pad = []
+    for i, k, s, d in zip(input_shape[1:-1], kernel_shape[:-1], strides, dilations):
+        pad.append(_compute_pad_size(i, i, k, s, d))
+
+    padded_shape = input_shape
+    for i in range(1, len(padded_shape) - 1):
+        padded_shape[i] += pad[i]
+
+    spatial_rank = layer_util.infer_spatial_rank(input_tensor)
+
+    padding_indices = np.zeros(padded_shape)
+
+    for d in range(spatial_rank):
+        tile_factors = copy.deepcopy(padded_shape)
+        tile_factors[d] = 1
+        dim_idcs = np.arange(-pad[d], input_shape[d] + 2*pad[d])
+        padding_indices[...,d] = np.tile(dim_idcs, tile_factors)
+
+    # Constant padding is (will soon be?) natively supported by TF on the GPU
+    # you have to go into the source code for conv_ops.cc to
+    # actually find it, but it's there.
+    # Until it becomes available, it could be solved with NiftyReg-based
+    # sampler layer by specifying 'NAN' as the boundary type, then
+    # substituting the desired constant for any nans-coming out of
+    # the resampler.
+    # if padding == 'CONSTANT':
+    #     resampler_padding = 'NAN'
+
+    if padding not in resampler.SUPPORTED_BOUNDARY:
+        raise ValueError(padding + ' is not a supported padding type')
+
+    padder = ResamplerLayer(interpolation='NEAREST',
+                            boundary=padding,
+                            name='conv_padding_' + name)
+
+    padded_input = padder(input_tensor, tf.constant(padding_indices))
+    conv_output = tf.nn.convolution(input=padded_input,
+                                    filter=kernel,
+                                    strides=strides,
+                                    dilation_rate=dilations,
+                                    padding='SAME',
+                                    name='conv_' + name)
+
+    extraction_indices = np.zeros(input_shape)
+    for d in range(spatial_rank):
+        tile_factors = copy.deepcopy(input_shape)
+        padded_shape[d] = 1
+        dim_idcs = np.arange(pad[d], input_shape[d] + pad[d])
+        padding_indices[...,d] = np.tile(dim_idcs, tile_factors)
+
+
+    extractor = ResamplerLayer(interpolation='NEAREST',
+                               boundary=padding,
+                               name='conv_extract_' + name)
+    return extractor(conv_output, tf.constant(extraction_indices))
