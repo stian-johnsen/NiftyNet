@@ -286,7 +286,7 @@ def _extended_convolution(input_tensor,
     input_shape = input_tensor.shape.as_list()
     kernel_shape = kernel.shape.as_list()
 
-    paddings = [(0, 0)]
+    dimpads = [0]
     for i, k, s, d in zip(input_shape[1:-1], kernel_shape[:-1],
                           strides, dilations):
         if i is None or i < 0 or k is None or k < 0:
@@ -295,13 +295,31 @@ def _extended_convolution(input_tensor,
                              'work.')
 
         pad = _compute_pad_size(i, i, k, s, d)
-        paddings.append((pad, pad))
-    paddings += [(0, 0)]
+        dimpads.append(pad)
+    dimpads += [0]
 
-    padded_input = tf.pad(input_tensor,
-                          paddings,
-                          mode=padding,
-                          constant_values=constant)
+    # Cannot pad by more than 1 dimension size => repeatedly pad
+    if padding == 'REFLECT':
+        padded_input = input_tensor
+        while min(o - i - p for o, i, p in zip(
+                padded_input.shape.as_list(),
+                input_shape,
+                dimpads)) < 0:
+            effective_pad = []
+            padded_shape = padded_input.shape.as_list()
+            for i in range(len(input_shape)):
+                epad = min(input_shape[i] + dimpads[i] - padded_shape[i],
+                           padded_shape[i] - 1)
+                effective_pad.append((epad, epad))
+
+            padded_input = tf.pad(padded_input,
+                                  effective_pad,
+                                  mode=padding)
+    else:
+        padded_input = tf.pad(input_tensor,
+                              [(d, d) for d in dimpads],
+                              mode=padding,
+                              constant_values=constant)
 
     conv_output = tf.nn.convolution(input=padded_input,
                                     filter=kernel,

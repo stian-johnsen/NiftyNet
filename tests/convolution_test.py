@@ -71,10 +71,16 @@ class ConvTest(tf.test.TestCase):
                         + init_dict['stride'])
         pad = [d*multiplier for d in input_shape[1:-1]]
         paddings = [(0, 0)] + [(p, p) for p in pad] + [(0, 0)]
+
+        if init_dict['padding'] == 'CONSTANT':
+            opts = {'constant_values': init_dict['padding_constant']}
+        else:
+            opts = {}
+
         enlarged_input = np.pad(orig_input,
                                 paddings,
                                 init_dict['padding'].lower(),
-                                constant_values=init_dict['padding_constant'])
+                                **opts)
 
         conv_layer.padding = 'SAME'
         large_output = conv_layer(tf.constant(enlarged_input),
@@ -109,19 +115,22 @@ class ConvTest(tf.test.TestCase):
 
     # padding tests
     def _test_extended_padding(self, pad, do_2d):
+        batch = self._get_pad_test_input_2d() if do_2d \
+            else self._get_pad_test_input_3d()
+
         const = 1.23
-        for ks in (2, 5):
-            for ds in (1, 4):
-                for ss in (1, 3):
+        min_dim = min(batch.shape[1:-1]) - 1
+        for ks in (2, min_dim):
+            for ds in (1, ks):
+                for ss in (1, min_dim):
                     init_dict = {'n_output_chns': 4,
                                  'kernel_size': ks,
                                  'stride': ss,
                                  'dilation': ds,
                                  'padding': pad,
+                                 'with_bn': False,
                                  'padding_constant': const,
-                                 'name': 'conv3'}
-                    batch = self._get_pad_test_input_2d() if do_2d \
-                        else self._get_pad_test_input_3d()
+                                 'name': 'conv' + ('2' if do_2d else '3')}
 
                     self._test_extended_conv(batch, init_dict)
 
