@@ -310,6 +310,8 @@ def _extended_convolution(input_tensor,
                                     padding='SAME',
                                     name='conv_' + name)
 
-    one_sided_pad = [l for l, _ in paddings]
+    output_shape = conv_output.shape.as_list()
+    out_pad = [(o - i)//2 for i, o in zip(input_shape, output_shape)]
 
-    return tf.slice(conv_output, one_sided_pad, input_shape)
+    return tf.slice(conv_output, out_pad, input_shape) if max(out_pad) > 0 \
+        else conv_output
