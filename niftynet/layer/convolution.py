@@ -299,18 +299,21 @@ def _extended_convolution(input_tensor,
     dimpads += [0]
 
     # Cannot pad by more than 1 dimension size => repeatedly pad
-    if padding == 'REFLECT':
+    if padding in ('REFLECT', 'SYMMETRIC'):
         padded_input = input_tensor
+        offset = 1 if padding == 'REFLECT' else 0
+
         while min(o - i - p for o, i, p in zip(
                 padded_input.shape.as_list(),
                 input_shape,
                 dimpads)) < 0:
-            effective_pad = []
+            effective_pad = [(0, 0)]
             padded_shape = padded_input.shape.as_list()
-            for i in range(len(input_shape)):
+            for i in range(1, len(input_shape) - 1):
                 epad = min(input_shape[i] + dimpads[i] - padded_shape[i],
-                           padded_shape[i] - 1)
+                           padded_shape[i] - offset)
                 effective_pad.append((epad, epad))
+            effective_pad += [(0, 0)]
 
             padded_input = tf.pad(padded_input,
                                   effective_pad,
@@ -320,6 +323,19 @@ def _extended_convolution(input_tensor,
                               [(d, d) for d in dimpads],
                               mode=padding,
                               constant_values=constant)
+
+    # DEL ME
+    print_op = tf.print('padded = ', padded_input)
+    with tf.control_dependencies([print_op]):
+        padded_input = padded_input
+    output_shape = padded_input.shape.as_list()
+    out_pad = [0]
+    out_pad += [(o - i)//2 for i, o in zip(input_shape[1:-1], output_shape[1:-1])]
+    out_pad += [0]
+    extr = tf.slice(padded_input, out_pad, input_shape)
+    err = tf.reduce_sum(tf.pow(input_tensor - extr, 2))
+    ref = tf.reduce_sum(tf.pow(input_tensor, 2))
+    padded_input = tf.Print(padded_input, [err/ref], message='extracted rel erro = ')
 
     conv_output = tf.nn.convolution(input=padded_input,
                                     filter=kernel,
@@ -331,7 +347,7 @@ def _extended_convolution(input_tensor,
     output_shape = conv_output.shape.as_list()
     out_pad = [0]
     out_pad += [(o - i)//2 for i, o in zip(input_shape[1:-1], output_shape[1:-1])]
-    out_pad = [0]
+    out_pad += [0]
 
     return tf.slice(conv_output, out_pad, input_shape) if max(out_pad) > 0 \
         else conv_output
