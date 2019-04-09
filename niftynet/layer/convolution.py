@@ -11,13 +11,9 @@ from niftynet.layer.base_layer import TrainableLayer
 from niftynet.layer.bn import BNLayer
 from niftynet.layer.gn import GNLayer
 from niftynet.utilities.util_common import look_up_operations
-# If and when niftynet.contrib.layer.resampler_optional_niftyreg is merged
-# replace w/ ResamplerOptionalNiftyRegLayer or better yet
-# NiftyregImageResamplingLayer
-import niftynet.layer.resampler as resampler
-from niftynet.layer.resampler import ResamplerLayer
 
-SUPPORTED_PADDING = set(['SAME', 'VALID', 'REPLICATE', 'SYMMETRIC', 'CONSTANT'])
+
+SUPPORTED_PADDING = set(['SAME', 'VALID', 'REFLECT', 'SYMMETRIC', 'CONSTANT'])
 
 
 def default_w_initializer():
@@ -275,7 +271,8 @@ def _extended_convolution(input_tensor,
     :param dilations: dilated convolution dilation factors
     (one per spatial dimension)
     :param padding: a string specifying the type of padding to apply
-    :param constant: a padding constant (only read in the case of constant padding)
+    :param constant: a padding constant (only read in the case of constant
+    padding)
     :param name: a name for the operation
     :return: a convolution result of the same size as the input tensor
     """
@@ -283,7 +280,7 @@ def _extended_convolution(input_tensor,
     input_shape = input_tensor.shape.as_list()
     kernel_shape = kernel.shape.as_list()
 
-    pad = []
+    paddings = [(0, 0)]
     for i, k, s, d in zip(input_shape[1:-1], kernel_shape[:-1],
                           strides, dilations):
         if i is None or i < 0 or k is None or k < 0:
@@ -291,37 +288,15 @@ def _extended_convolution(input_tensor,
                              ' must be known in advance for this operation to '
                              'work.')
 
-        pad.append(_compute_pad_size(i, i, k, s, d))
+        pad = _compute_pad_size(i, i, k, s, d)
+        paddings.append((pad, pad))
+    paddings += [(0, 0)]
 
-    padded_shape = input_shape
-    for i in range(1, len(padded_shape) - 1):
-        padded_shape[i] += pad[i-1]
+    padded_input = tf.pad(input_tensor,
+                          paddings,
+                          mode='CONSTANT',
+                          constant_values=padding)
 
-    spatial_rank = layer_util.infer_spatial_rank(input_tensor)
-
-    padding_indices = np.zeros(padded_shape)
-
-    for d in range(spatial_rank):
-        tile_factors = copy.deepcopy(padded_shape)
-        tile_factors[d] = 1
-        dim_idcs = np.arange(-pad[d], input_shape[d] + 2*pad[d])
-        padding_indices[...,d] = np.tile(dim_idcs, tile_factors)
-
-    if padding not in resampler.SUPPORTED_BOUNDARY:
-        raise ValueError(padding + ' is not a supported padding type')
-
-    if padding == 'CONSTANT':
-        paddings = [[p, p] for p in pad]
-        padded_input = tf.pad(input_tensor,
-                              paddings,
-                              mode='CONSTANT',
-                              constant_values=constant)
-    else:
-        padder = ResamplerLayer(interpolation='NEAREST',
-                                boundary=padding,
-                                name='conv_padding_' + name)
-
-        padded_input = padder(input_tensor, tf.constant(padding_indices))
     conv_output = tf.nn.convolution(input=padded_input,
                                     filter=kernel,
                                     strides=strides,
@@ -329,4 +304,6 @@ def _extended_convolution(input_tensor,
                                     padding='SAME',
                                     name='conv_' + name)
 
-    return tf.slice(conv_output, [0] + pad + [0], input_shape)
+    one_sided_pad = [l for l, _ in paddings]
+
+    return tf.slice(conv_output, [0] + one_sided_pad + [0], input_shape)
