@@ -329,7 +329,9 @@ def _extended_convolution(input_tensor,
                                     name='conv_' + name)
 
     output_shape = conv_output.shape.as_list()
-    out_pad = [(o - i)//2 for i, o in zip(input_shape, output_shape)]
+    out_pad = [0]
+    out_pad += [(o - i)//2 for i, o in zip(input_shape[1:-1], output_shape[1:-1])]
+    out_pad = [0]
 
     return tf.slice(conv_output, out_pad, input_shape) if max(out_pad) > 0 \
         else conv_output
