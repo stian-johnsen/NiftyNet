@@ -53,7 +53,13 @@ class ConvLayer(TrainableLayer):
                  w_regularizer=None,
                  b_initializer=None,
                  b_regularizer=None,
+                 padding_constant=0,
                  name='conv'):
+        """
+        :param padding_constant: a constant applied in padded convolution
+        (see also tf.pad)
+        """
+
         super(ConvLayer, self).__init__(name=name)
 
         self.padding = look_up_operations(padding.upper(), SUPPORTED_PADDING)
@@ -62,6 +68,7 @@ class ConvLayer(TrainableLayer):
         self.stride = stride
         self.dilation = dilation
         self.with_bias = with_bias
+        self.padding_constant = padding_constant
 
         self.initializers = {
             'w': w_initializer if w_initializer else default_w_initializer(),
@@ -96,11 +103,13 @@ class ConvLayer(TrainableLayer):
                                               padding=self.padding,
                                               name='conv')
         else:
-            output_tensor = _extended_convolution(input_tensor,
-                                                  conv_kernel,
-                                                  full_stride,
-                                                  full_dilation,
-                                                  self.padding)
+            output_tensor = _extended_convolution(
+                input_tensor,
+                conv_kernel,
+                full_stride,
+                full_dilation,
+                self.padding,
+                constant=self.padding_constant)
 
         if not self.with_bias:
             return output_tensor
