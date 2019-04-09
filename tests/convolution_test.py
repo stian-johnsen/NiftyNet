@@ -1,5 +1,6 @@
 from __future__ import absolute_import, print_function
 
+import numpy as np
 import tensorflow as tf
 from tensorflow.contrib.layers.python.layers import regularizers
 
@@ -56,29 +57,91 @@ class ConvTest(tf.test.TestCase):
             output_value = sess.run(output_data)
             self.assertAllClose(output_shape, output_value.shape)
 
-    def _test_extended_conv(self, enlarged_input, orig_input, init_dict,
-                            pad_offsets):
-        conv_layer = ConvolutionalLayer(init_dict)
-        small_output = conv_layer(orig_input)
+    def _test_extended_conv(self, orig_input, init_dict):
+        """
+        Tests the extended padding options of ConvLayer
+        """
+
+        conv_layer = ConvolutionalLayer(**init_dict)
+        small_output = conv_layer(tf.constant(orig_input), is_training=False)
+
+        input_shape = orig_input.shape
+        multiplier = 3*(init_dict['kernel_size']
+                        + init_dict['dilation']
+                        + init_dict['stride'])
+        pad = [d*multiplier for d in input_shape[1:-1]]
+        paddings = [(0, 0)] + [(p, p) for p in pad] + [(0, 0)]
+        enlarged_input = np.pad(orig_input,
+                                paddings,
+                                init_dict['padding'].lower(),
+                                constant_values=init_dict['padding_constant'])
 
         conv_layer.padding = 'SAME'
-        large_output = conv_layer(enlarged_input)
+        large_output = conv_layer(tf.constant(enlarged_input),
+                                  is_training=False)
 
         with self.test_session() as sess:
+            sess.run(tf.global_variables_initializer())
+
             small_value = sess.run(small_output)
             large_value = sess.run(large_output)
 
             extr_slices = [slice(None)]
-            for d in range(len(pad_offsets)):
-                extr_slices.append(slice(pad_offsets[d],
-                                         pad_offsets[d]
-                                         + small_value.shape[1+d]))
+            for d in range(len(pad)):
+                extr_slices.append(slice(
+                    pad[d], pad[d] + small_value.shape[1+d]))
 
             while len(extr_slices) < len(small_value.shape):
                 extr_slices.append(slice(None))
 
             extr_value = large_value[extr_slices]
             self.assertAllClose(small_value, extr_value)
+
+    def _get_pad_test_input_3d(self):
+        data = np.arange(1024, dtype=np.float32)
+
+        return data.reshape([1, 16, 4, 4, 4])
+
+    def _get_pad_test_input_2d(self):
+        data = np.arange(256, dtype=np.float32)
+
+        return data.reshape([4, 8, 4, 2])
+
+    # padding tests
+    def _test_extended_padding(self, pad, do_2d):
+        const = 1.23
+        for ks in (2, 5):
+            for ds in (1, 4):
+                for ss in (1, 3):
+                    init_dict = {'n_output_chns': 4,
+                                 'kernel_size': ks,
+                                 'stride': ss,
+                                 'dilation': ds,
+                                 'padding': pad,
+                                 'padding_constant': const,
+                                 'name': 'conv3'}
+                    batch = self._get_pad_test_input_2d() if do_2d \
+                        else self._get_pad_test_input_3d()
+
+                    self._test_extended_conv(batch, init_dict)
+
+    def test_2d_const_padding(self):
+        self._test_extended_padding('CONSTANT', True)
+
+    def test_2d_reflect_padding(self):
+        self._test_extended_padding('REFLECT', True)
+
+    def test_2d_symmetric_padding(self):
+        self._test_extended_padding('SYMMETRIC', True)
+
+    def test_3d_const_padding(self):
+        self._test_extended_padding('CONSTANT', False)
+
+    def test_3d_reflect_padding(self):
+        self._test_extended_padding('REFLECT', False)
+
+    def test_3d_symmetric_padding(self):
+        self._test_extended_padding('SYMMETRIC', False)
 
     # 3d tests
     def test_3d_conv_default_shape(self):

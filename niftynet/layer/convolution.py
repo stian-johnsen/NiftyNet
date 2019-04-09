@@ -149,7 +149,11 @@ class ConvolutionalLayer(TrainableLayer):
                  b_regularizer=None,
                  moving_decay=0.9,
                  eps=1e-5,
+                 padding_constant=0,
                  name="conv"):
+        """
+        :param padding_constant: constant applied with CONSTANT padding
+        """
 
         self.acti_func = acti_func
         self.with_bn = with_bn
@@ -173,6 +177,7 @@ class ConvolutionalLayer(TrainableLayer):
         self.dilation = dilation
         self.padding = padding
         self.with_bias = with_bias
+        self.padding_constant = padding_constant
 
         # for BNLayer
         self.moving_decay = moving_decay
@@ -195,6 +200,7 @@ class ConvolutionalLayer(TrainableLayer):
                                w_regularizer=self.regularizers['w'],
                                b_initializer=self.initializers['b'],
                                b_regularizer=self.regularizers['b'],
+                               padding_constant=self.padding_constant,
                                name='conv_')
 
         if self.with_bn:
@@ -294,8 +300,8 @@ def _extended_convolution(input_tensor,
 
     padded_input = tf.pad(input_tensor,
                           paddings,
-                          mode='CONSTANT',
-                          constant_values=padding)
+                          mode=padding,
+                          constant_values=constant)
 
     conv_output = tf.nn.convolution(input=padded_input,
                                     filter=kernel,
@@ -306,4 +312,4 @@ def _extended_convolution(input_tensor,
 
     one_sided_pad = [l for l, _ in paddings]
 
-    return tf.slice(conv_output, [0] + one_sided_pad + [0], input_shape)
+    return tf.slice(conv_output, one_sided_pad, input_shape)
