@@ -17,7 +17,7 @@ from niftynet.utilities.util_common import look_up_operations
 import niftynet.layer.resampler as resampler
 from niftynet.layer.resampler import ResamplerLayer
 
-SUPPORTED_PADDING = set(['SAME', 'VALID', 'REPLICATE', 'SYMMETRIC'])
+SUPPORTED_PADDING = set(['SAME', 'VALID', 'REPLICATE', 'SYMMETRIC', 'CONSTANT'])
 
 
 def default_w_initializer():
@@ -247,7 +247,12 @@ def _compute_pad_size(input_dim_size, output_dim_size, kernel_dim_size,
             - input_dim_size)//2
 
 
-def _extended_convolution(input_tensor, kernel, strides, dilations, padding,
+def _extended_convolution(input_tensor,
+                          kernel,
+                          strides,
+                          dilations,
+                          padding,
+                          constant=0,
                           name='extended_convolution'):
     """
     A simple wrapper for tf.nn.convolution that first expands the input tensor
@@ -261,6 +266,7 @@ def _extended_convolution(input_tensor, kernel, strides, dilations, padding,
     :param dilations: dilated convolution dilation factors
     (one per spatial dimension)
     :param padding: a string specifying the type of padding to apply
+    :param constant: a padding constant (only read in the case of constant padding)
     :param name: a name for the operation
     :return: a convolution result of the same size as the input tensor
     """
@@ -286,24 +292,21 @@ def _extended_convolution(input_tensor, kernel, strides, dilations, padding,
         dim_idcs = np.arange(-pad[d], input_shape[d] + 2*pad[d])
         padding_indices[...,d] = np.tile(dim_idcs, tile_factors)
 
-    # Constant padding is (will soon be?) natively supported by TF on the GPU
-    # you have to go into the source code for conv_ops.cc to
-    # actually find it, but it's there.
-    # Until it becomes available, it could be solved with NiftyReg-based
-    # sampler layer by specifying 'NAN' as the boundary type, then
-    # substituting the desired constant for any nans-coming out of
-    # the resampler.
-    # if padding == 'CONSTANT':
-    #     resampler_padding = 'NAN'
-
     if padding not in resampler.SUPPORTED_BOUNDARY:
         raise ValueError(padding + ' is not a supported padding type')
 
-    padder = ResamplerLayer(interpolation='NEAREST',
-                            boundary=padding,
-                            name='conv_padding_' + name)
+    if padding == 'CONSTANT':
+        paddings = [[p, p] for p in pad]
+        padded_input = tf.pad(input_tensor,
+                              paddings,
+                              mode='CONSTANT',
+                              constant_values=constant)
+    else:
+        padder = ResamplerLayer(interpolation='NEAREST',
+                                boundary=padding,
+                                name='conv_padding_' + name)
 
-    padded_input = padder(input_tensor, tf.constant(padding_indices))
+        padded_input = padder(input_tensor, tf.constant(padding_indices))
     conv_output = tf.nn.convolution(input=padded_input,
                                     filter=kernel,
                                     strides=strides,
