@@ -314,15 +314,4 @@ def _extended_convolution(input_tensor,
                                     padding='SAME',
                                     name='conv_' + name)
 
-    extraction_indices = np.zeros(input_shape)
-    for d in range(spatial_rank):
-        tile_factors = copy.deepcopy(input_shape)
-        padded_shape[d] = 1
-        dim_idcs = np.arange(pad[d], input_shape[d] + pad[d])
-        padding_indices[...,d] = np.tile(dim_idcs, tile_factors)
-
-    extractor = ResamplerLayer(interpolation='NEAREST',
-                               boundary=padding,
-                               name='conv_extract_' + name)
-
-    return extractor(conv_output, tf.constant(extraction_indices))
+    return tf.slice(conv_output, [0] + pad + [0], input_shape)
