@@ -275,12 +275,18 @@ def _extended_convolution(input_tensor,
     kernel_shape = kernel.shape.as_list()
 
     pad = []
-    for i, k, s, d in zip(input_shape[1:-1], kernel_shape[:-1], strides, dilations):
+    for i, k, s, d in zip(input_shape[1:-1], kernel_shape[:-1],
+                          strides, dilations):
+        if i is None or i < 0 or k is None or k < 0:
+            raise ValueError('The dimensions of the input tensor and the filter'
+                             ' must be known in advance for this operation to '
+                             'work.')
+
         pad.append(_compute_pad_size(i, i, k, s, d))
 
     padded_shape = input_shape
     for i in range(1, len(padded_shape) - 1):
-        padded_shape[i] += pad[i]
+        padded_shape[i] += pad[i-1]
 
     spatial_rank = layer_util.infer_spatial_rank(input_tensor)
 
