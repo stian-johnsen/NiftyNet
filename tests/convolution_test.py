@@ -1,5 +1,6 @@
 from __future__ import division, absolute_import, print_function
 
+import functools as ft
 import numpy as np
 import tensorflow as tf
 from tensorflow.contrib.layers.python.layers import regularizers
@@ -62,7 +63,24 @@ class ConvTest(tf.test.TestCase):
         Tests the extended padding options of ConvLayer
         """
 
-        del init_dict['with_bn']
+        def _w_init(shape, dtype=tf.float32, **kwargs):
+            data = np.arange(ft.reduce(lambda prod, x: prod*x, shape, 1))\
+                     .astype(np.float32)
+            data *= 2.374/data.mean()
+            data -= data.mean()
+
+            return tf.constant(data.reshape(shape), dtype=dtype)
+
+        def _b_init(shape, dtype=tf.float32, **kwargs):
+            data = np.arange(shape[0]).astype(np.float32)
+            data *= 0.273/data.mean()
+            data -= data.mean()
+
+            return tf.constant(data.reshape(shape), dtype=dtype)
+
+        init_dict['w_initializer'] = _w_init
+        init_dict['b_initializer'] = _b_init
+
         conv_layer = ConvLayer(**init_dict)
         small_output = conv_layer(tf.constant(orig_input))
 
@@ -110,7 +128,7 @@ class ConvTest(tf.test.TestCase):
 
             print(np.square(small_value - extr_value).sum()/np.square(extr_value).sum())
 
-            self.assertAllClose(small_value, extr_value)
+            self.assertAllClose(small_value, extr_value, rtol=1e-3)
 
     def _get_pad_test_input_3d(self):
         data = np.arange(1024, dtype=np.float32)
@@ -131,13 +149,13 @@ class ConvTest(tf.test.TestCase):
         min_dim = min(batch.shape[1:-1]) - 1
         for ks in (2, min_dim):
             for ds in (1, min_dim):
-                name = 'conv' + ('2' if do_2d else '3')
+                name = 'pad_test_conv' + ('2' if do_2d else '3')
+                name += "%i_%i" % (ks, ds)
                 init_dict = {'n_output_chns': 4,
                              'kernel_size': ks,
                              'stride': 1,
                              'dilation': ds,
                              'padding': pad,
-                             'with_bn': False,
                              'name': name}
 
                 if ds%2 == 0:
