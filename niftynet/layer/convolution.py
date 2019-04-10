@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, print_function
 
-import copy
 import numpy as np
 import tensorflow as tf
 
@@ -11,7 +10,6 @@ from niftynet.layer.base_layer import TrainableLayer
 from niftynet.layer.bn import BNLayer
 from niftynet.layer.gn import GNLayer
 from niftynet.utilities.util_common import look_up_operations
-
 
 SUPPORTED_PADDING = set(['SAME', 'VALID', 'REFLECT', 'SYMMETRIC', 'CONSTANT'])
 
@@ -99,15 +97,13 @@ class ConvLayer(TrainableLayer):
                                               padding=self.padding,
                                               name='conv')
         else:
-            output_tensor, large = _extended_convolution(
+            output_tensor = _extended_convolution(
                 input_tensor,
                 conv_kernel,
                 full_stride,
                 full_dilation,
                 self.padding,
                 constant=self.padding_constant)
-
-            return output_tensor, large
 
         if not self.with_bias:
             return output_tensor
