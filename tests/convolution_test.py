@@ -62,23 +62,15 @@ class ConvTest(tf.test.TestCase):
         Tests the extended padding options of ConvLayer
         """
 
-        conv_layer = ConvolutionalLayer(**init_dict)
-        small_output = conv_layer(tf.constant(orig_input), is_training=False)
+        del init_dict['with_bn']
+        conv_layer = ConvLayer(**init_dict)
+        small_output = conv_layer(tf.constant(orig_input))
 
         input_shape = orig_input.shape
-        multiplier = 3*(init_dict['kernel_size']
-                        + init_dict['dilation']
-                        + init_dict['stride'])
+        multiplier = init_dict['kernel_size'] + init_dict['dilation'] \
+            + init_dict['stride']
         pad = [d*multiplier for d in input_shape[1:-1]]
         paddings = [(0, 0)] + [(p, p) for p in pad] + [(0, 0)]
-
-        from niftynet.layer.convolution import _compute_pad_size
-
-        ksize = init_dict['kernel_size']
-        stride = init_dict['stride']
-        dilation = init_dict['dilation']
-        paddings = [(0,0)] + [(_compute_pad_size(i, i, ksize, stride, dilation),
-                               _compute_pad_size(i, i, ksize, stride, dilation)) for i in input_shape[1:-1]] + [(0,0)]
 
         if init_dict['padding'] == 'CONSTANT':
             opts = {'constant_values': init_dict.get('padding_constant', 0)}
@@ -91,8 +83,7 @@ class ConvTest(tf.test.TestCase):
                                 **opts)
 
         conv_layer.padding = 'SAME'
-        large_output = conv_layer(tf.constant(enlarged_input),
-                                  is_training=False)
+        large_output = conv_layer(tf.constant(enlarged_input))
 
         def _extract_valid_region(output_tensor, target_tensor):
             output_shape = output_tensor.shape
@@ -118,9 +109,6 @@ class ConvTest(tf.test.TestCase):
             extr_value = _extract_valid_region(large_value, small_value)
 
             print(np.square(small_value - extr_value).sum()/np.square(extr_value).sum())
-            # print('small = ', small_value)
-            # print('large = ', large_value)
-            # print('extr = ', extr_value)
 
             self.assertAllClose(small_value, extr_value)
 
@@ -143,41 +131,40 @@ class ConvTest(tf.test.TestCase):
         min_dim = min(batch.shape[1:-1]) - 1
         for ks in (2, min_dim):
             for ds in (1, min_dim):
-                for ss in (1, min_dim):
-                    name = 'conv' + ('2' if do_2d else '3')
-                    init_dict = {'n_output_chns': 4,
-                                 'kernel_size': ks,
-                                 'stride': ss,
-                                 'dilation': ds,
-                                 'padding': pad,
-                                 'with_bn': False,
-                                 'name': name}
+                name = 'conv' + ('2' if do_2d else '3')
+                init_dict = {'n_output_chns': 4,
+                             'kernel_size': ks,
+                             'stride': 1,
+                             'dilation': ds,
+                             'padding': pad,
+                             'with_bn': False,
+                             'name': name}
 
-                    if ss%2 == 0:
-                        init_dict['padding_constant'] = const
+                if ds%2 == 0:
+                    init_dict['padding_constant'] = const
 
-                    self._test_extended_conv(batch, init_dict)
+                self._test_extended_conv(batch, init_dict)
 
     def test_2d_const_padding(self):
         self._test_extended_padding('CONSTANT', True)
 
-    def DISABLE_test_2d_reflect_padding(self):
+    def test_2d_reflect_padding(self):
         self._test_extended_padding('REFLECT', True)
 
-    def DISABLE_test_2d_symmetric_padding(self):
+    def test_2d_symmetric_padding(self):
         self._test_extended_padding('SYMMETRIC', True)
 
-    def DISABLE_test_3d_const_padding(self):
+    def test_3d_const_padding(self):
         self._test_extended_padding('CONSTANT', False)
 
-    def DISABLE_test_3d_reflect_padding(self):
+    def test_3d_reflect_padding(self):
         self._test_extended_padding('REFLECT', False)
 
-    def DISABLE_test_3d_symmetric_padding(self):
+    def test_3d_symmetric_padding(self):
         self._test_extended_padding('SYMMETRIC', False)
 
     # 3d tests
-    def DISABLE_test_3d_conv_default_shape(self):
+    def test_3d_conv_default_shape(self):
         input_param = {'n_output_chns': 10,
                        'kernel_size': 3,
                        'stride': 1}
@@ -185,7 +172,7 @@ class ConvTest(tf.test.TestCase):
                                      param_dict=input_param,
                                      output_shape=(2, 16, 16, 16, 10))
 
-    def DISABLE_test_3d_conv_full_kernel_size(self):
+    def test_3d_conv_full_kernel_size(self):
         input_param = {'n_output_chns': 10,
                        'kernel_size': [3, 3, 1],
                        'stride': 1}
@@ -193,7 +180,7 @@ class ConvTest(tf.test.TestCase):
                                      param_dict=input_param,
                                      output_shape=(2, 16, 16, 16, 10))
 
-    def DISABLE_test_3d_conv_full_strides(self):
+    def test_3d_conv_full_strides(self):
         input_param = {'n_output_chns': 10,
                        'kernel_size': [3, 3, 1],
                        'stride': [1, 1, 2]}
@@ -201,7 +188,7 @@ class ConvTest(tf.test.TestCase):
                                      param_dict=input_param,
                                      output_shape=(2, 16, 16, 8, 10))
 
-    def DISABLE_test_3d_anisotropic_conv(self):
+    def test_3d_anisotropic_conv(self):
         input_param = {'n_output_chns': 10,
                        'kernel_size': [3, 2, 1],
                        'stride': [1, 1, 2]}
@@ -209,7 +196,7 @@ class ConvTest(tf.test.TestCase):
                                      param_dict=input_param,
                                      output_shape=(2, 16, 16, 8, 10))
 
-    def DISABLE_test_3d_conv_bias_shape(self):
+    def test_3d_conv_bias_shape(self):
         input_param = {'n_output_chns': 10,
                        'kernel_size': [3, 1, 3],
                        'stride': [1, 1, 2],
@@ -218,7 +205,7 @@ class ConvTest(tf.test.TestCase):
                                      param_dict=input_param,
                                      output_shape=(2, 16, 16, 8, 10))
 
-    def DISABLE_test_conv_3d_bias_reg_shape(self):
+    def test_conv_3d_bias_reg_shape(self):
         input_param = {'n_output_chns': 10,
                        'kernel_size': [3, 1, 3],
                        'stride': [2, 2, 2],
@@ -229,7 +216,7 @@ class ConvTest(tf.test.TestCase):
                                      param_dict=input_param,
                                      output_shape=(2, 8, 8, 8, 10))
 
-    def DISABLE_test_3d_convlayer_default_shape(self):
+    def test_3d_convlayer_default_shape(self):
         input_param = {'n_output_chns': 10,
                        'kernel_size': 3,
                        'stride': 1}
@@ -237,7 +224,7 @@ class ConvTest(tf.test.TestCase):
                                      param_dict=input_param,
                                      output_shape=(2, 16, 16, 16, 10))
 
-    def DISABLE_test_3d_convlayer_dilation_default_shape(self):
+    def test_3d_convlayer_dilation_default_shape(self):
         input_param = {'n_output_chns': 10,
                        'kernel_size': 3,
                        'stride': 1,
@@ -246,7 +233,7 @@ class ConvTest(tf.test.TestCase):
                                      param_dict=input_param,
                                      output_shape=(2, 16, 16, 16, 10))
 
-    def DISABLE_test_3d_convlayer_bias_shape(self):
+    def test_3d_convlayer_bias_shape(self):
         input_param = {'n_output_chns': 10,
                        'kernel_size': 3,
                        'stride': 1,
@@ -256,7 +243,7 @@ class ConvTest(tf.test.TestCase):
                                            param_dict=input_param,
                                            output_shape=(2, 16, 16, 16, 10))
 
-    def DISABLE_test_convlayer_3d_bias_reg_shape(self):
+    def test_convlayer_3d_bias_reg_shape(self):
         input_param = {'n_output_chns': 10,
                        'kernel_size': 3,
                        'stride': 1,
@@ -268,7 +255,7 @@ class ConvTest(tf.test.TestCase):
                                            param_dict=input_param,
                                            output_shape=(2, 16, 16, 16, 10))
 
-    def DISABLE_test_convlayer_3d_bn_reg_shape(self):
+    def test_convlayer_3d_bn_reg_shape(self):
         input_param = {'n_output_chns': 10,
                        'kernel_size': [5, 1, 2],
                        'stride': 1,
@@ -281,7 +268,7 @@ class ConvTest(tf.test.TestCase):
                                            output_shape=(2, 16, 16, 16, 10),
                                            is_training=True)
 
-    def DISABLE_test_convlayer_3d_bn_reg_prelu_shape(self):
+    def test_convlayer_3d_bn_reg_prelu_shape(self):
         input_param = {'n_output_chns': 10,
                        'kernel_size': [5, 1, 2],
                        'stride': [1, 1, 2],
@@ -295,7 +282,7 @@ class ConvTest(tf.test.TestCase):
                                            output_shape=(2, 16, 16, 8, 10),
                                            is_training=True)
 
-    def DISABLE_test_convlayer_3d_relu_shape(self):
+    def test_convlayer_3d_relu_shape(self):
         input_param = {'n_output_chns': 10,
                        'kernel_size': [5, 1, 2],
                        'stride': [1, 2, 2],
@@ -309,7 +296,7 @@ class ConvTest(tf.test.TestCase):
                                            output_shape=(2, 16, 8, 8, 10),
                                            is_training=True)
 
-    def DISABLE_test_convlayer_3d_bn_reg_dropout_shape(self):
+    def test_convlayer_3d_bn_reg_dropout_shape(self):
         input_param = {'n_output_chns': 10,
                        'kernel_size': [5, 1, 2],
                        'stride': [1, 2, 2],
@@ -322,7 +309,7 @@ class ConvTest(tf.test.TestCase):
                                            is_training=True,
                                            dropout_prob=0.4)
 
-    def DISABLE_test_convlayer_3d_bn_reg_dropout_valid_shape(self):
+    def test_convlayer_3d_bn_reg_dropout_valid_shape(self):
         input_param = {'n_output_chns': 10,
                        'kernel_size': [5, 3, 2],
                        'stride': [2, 2, 3],
@@ -337,7 +324,7 @@ class ConvTest(tf.test.TestCase):
                                            is_training=True,
                                            dropout_prob=0.4)
 
-    def DISABLE_test_convlayer_3d_group_reg_dropout_valid_shape(self):
+    def test_convlayer_3d_group_reg_dropout_valid_shape(self):
         input_param = {'n_output_chns': 8,
                        'kernel_size': [5, 3, 2],
                        'stride': [2, 2, 3],
@@ -352,7 +339,7 @@ class ConvTest(tf.test.TestCase):
                                            dropout_prob=0.4)
 
     # 2d tests
-    def DISABLE_test_2d_conv_default_shape(self):
+    def test_2d_conv_default_shape(self):
         input_param = {'n_output_chns': 10,
                        'kernel_size': [5, 3],
                        'stride': [2, 2]}
@@ -360,7 +347,7 @@ class ConvTest(tf.test.TestCase):
                                      param_dict=input_param,
                                      output_shape=(2, 8, 8, 10))
 
-    def DISABLE_test_2d_conv_dilation_default_shape(self):
+    def test_2d_conv_dilation_default_shape(self):
         input_param = {'n_output_chns': 10,
                        'kernel_size': [5, 3],
                        'stride': [1, 1],
@@ -369,7 +356,7 @@ class ConvTest(tf.test.TestCase):
                                      param_dict=input_param,
                                      output_shape=(2, 16, 16, 10))
 
-    def DISABLE_test_2d_conv_bias_shape(self):
+    def test_2d_conv_bias_shape(self):
         input_param = {'n_output_chns': 10,
                        'kernel_size': [5, 3],
                        'stride': [1, 2],
@@ -378,7 +365,7 @@ class ConvTest(tf.test.TestCase):
                                      param_dict=input_param,
                                      output_shape=(2, 16, 8, 10))
 
-    def DISABLE_test_conv_2d_bias_reg_shape(self):
+    def test_conv_2d_bias_reg_shape(self):
         input_param = {'n_output_chns': 10,
                        'kernel_size': 5,
                        'stride': 1,
@@ -389,7 +376,7 @@ class ConvTest(tf.test.TestCase):
                                      param_dict=input_param,
                                      output_shape=(2, 16, 16, 10))
 
-    def DISABLE_test_2d_convlayer_default_shape(self):
+    def test_2d_convlayer_default_shape(self):
         input_param = {'n_output_chns': 10,
                        'kernel_size': 2,
                        'stride': 1,
@@ -399,7 +386,7 @@ class ConvTest(tf.test.TestCase):
                                            output_shape=(2, 16, 16, 10),
                                            is_training=True)
 
-    def DISABLE_test_2d_convlayer_bias_shape(self):
+    def test_2d_convlayer_bias_shape(self):
         input_param = {'n_output_chns': 10,
                        'kernel_size': 2,
                        'stride': [2, 1],
@@ -409,7 +396,7 @@ class ConvTest(tf.test.TestCase):
                                            param_dict=input_param,
                                            output_shape=(2, 8, 16, 10))
 
-    def DISABLE_test_convlayer_2d_bias_reg_shape(self):
+    def test_convlayer_2d_bias_reg_shape(self):
         input_param = {'n_output_chns': 10,
                        'kernel_size': [3, 5],
                        'stride': [2, 1],
@@ -421,7 +408,7 @@ class ConvTest(tf.test.TestCase):
                                            param_dict=input_param,
                                            output_shape=(2, 8, 16, 10))
 
-    def DISABLE_test_convlayer_2d_bn_reg_shape(self):
+    def test_convlayer_2d_bn_reg_shape(self):
         input_param = {'n_output_chns': 10,
                        'kernel_size': [3, 5],
                        'stride': [2, 1],
@@ -434,7 +421,7 @@ class ConvTest(tf.test.TestCase):
                                            output_shape=(2, 8, 16, 10),
                                            is_training=True)
 
-    def DISABLE_test_convlayer_2d_bn_reg_prelu_2_shape(self):
+    def test_convlayer_2d_bn_reg_prelu_2_shape(self):
         input_param = {'n_output_chns': 10,
                        'kernel_size': 3,
                        'stride': [2, 1],
@@ -446,7 +433,7 @@ class ConvTest(tf.test.TestCase):
                                            output_shape=(2, 8, 16, 10),
                                            is_training=True)
 
-    def DISABLE_test_convlayer_2d_relu_shape(self):
+    def test_convlayer_2d_relu_shape(self):
         input_param = {'n_output_chns': 10,
                        'kernel_size': 3,
                        'stride': [3, 1],
@@ -458,7 +445,7 @@ class ConvTest(tf.test.TestCase):
                                            output_shape=(2, 6, 16, 10),
                                            is_training=True)
 
-    def DISABLE_test_convlayer_2d_bn_reg_prelu_shape(self):
+    def test_convlayer_2d_bn_reg_prelu_shape(self):
         input_param = {'n_output_chns': 10,
                        'kernel_size': 3,
                        'stride': 1,
@@ -471,7 +458,7 @@ class ConvTest(tf.test.TestCase):
                                            output_shape=(2, 16, 16, 10),
                                            is_training=True)
 
-    def DISABLE_test_convlayer_2d_bn_reg_valid_shape(self):
+    def test_convlayer_2d_bn_reg_valid_shape(self):
         input_param = {'n_output_chns': 10,
                        'kernel_size': [3, 2],
                        'stride': [2, 3],
