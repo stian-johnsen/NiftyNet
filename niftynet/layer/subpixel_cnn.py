@@ -5,7 +5,7 @@ import tensorflow as tf
 
 from niftynet.layer import layer_util
 from niftynet.layer.base_layer import TrainableLayer
-from niftynet.layer.convolution.ConvolutionalLayer
+from niftynet.layer.convolution import ConvolutionalLayer
 
 class SubPixelCNNLayer(TrainableLayer):
     """
@@ -18,7 +18,8 @@ class SubPixelCNNLayer(TrainableLayer):
     """
 
     def __init__(self,
-                 upsample_factor,
+                 num_classes=1,
+                 upsample_factor=3,
                  layer_configurations=((5, 64),
                                        (3, 32),
                                        (3, -1)),
@@ -36,17 +37,17 @@ class SubPixelCNNLayer(TrainableLayer):
         layer must have a feature-map size of -1.
         """
 
-
         super(SubPixelCNNLayer, self).__init__(name=name)
 
         if layer_configurations[-1][1] >= 0:
             raise ValueError('The size of the last feature map must be -1')
 
+        self.upsample_factor = upsample_factor
         self.layer_configurations = layer_configurations
         self.acti_func = acti_func
         self.with_bn = with_bn
 
-    def layer_op(self, lr_images):
+    def layer_op(self, lr_images, is_training=True, keep_prob=1.0):
         input_shape = lr_images.shape.as_list()
         batch_size = input_shape[0]
         input_shape = input_shape[1:]
@@ -65,6 +66,7 @@ class SubPixelCNNLayer(TrainableLayer):
                                           kernel_size=ksize,
                                           acti_func=self.acti_func,
                                           with_bias=True,
+                                          with_bn=self.with_bn,
                                           name=name)
             else:
                 nof_features = nof_channels*(self.upsample_factor**2)
@@ -72,12 +74,18 @@ class SubPixelCNNLayer(TrainableLayer):
                                           kernel_size=ksize,
                                           acti_func=None,
                                           with_bias=True,
+                                          with_bn=self.with_bn,
                                           name=name)
 
-            features = conv(features)
+            features = conv(features, is_training=is_training,
+                            keep_prob=keep_prob)
 
         output_shape = [batch_size] \
-            + [self.upsample_factor*i for i in input_shape]
+            + [self.upsample_factor*i for i in input_shape[:-1]] \
+            + [nof_channels]
+
+        print('in shape = ', lr_images.shape.as_list())
+        print('out shape = ', output_shape)
 
         return tf.contrib.periodic_resample.periodic_resample(features,
                                                               output_shape,
