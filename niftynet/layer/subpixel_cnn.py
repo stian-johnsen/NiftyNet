@@ -18,7 +18,6 @@ class SubPixelCNNLayer(TrainableLayer):
     """
 
     def __init__(self,
-                 num_classes=1,
                  upsample_factor=3,
                  layer_configurations=((5, 64),
                                        (3, 32),
@@ -39,18 +38,25 @@ class SubPixelCNNLayer(TrainableLayer):
 
         super(SubPixelCNNLayer, self).__init__(name=name)
 
-        if layer_configurations[-1][1] >= 0:
+        if layer_configurations[-1][1] != -1:
             raise ValueError('The size of the last feature map must be -1')
 
         self.upsample_factor = upsample_factor
         self.layer_configurations = layer_configurations
         self.acti_func = acti_func
-        self.with_bn = with_bn
+
+        self.base_layer_params = {'with_bias': True,
+                                  'with_bn': with_bn,
+                                  'w_initializer': w_initializer,
+                                  'b_initializer': b_initializer,
+                                  'w_regularizer': w_regularizer,
+                                  'b_regularizer': b_regularizer}
 
     def layer_op(self, lr_images, is_training=True, keep_prob=1.0):
         input_shape = lr_images.shape.as_list()
         batch_size = input_shape[0]
         input_shape = input_shape[1:]
+        nof_dims = len(input_shape) - 1
 
         if any(i is None or i <= 0 for i in input_shape):
             raise ValueError('The image shape must be known in advance.')
@@ -65,17 +71,15 @@ class SubPixelCNNLayer(TrainableLayer):
                 conv = ConvolutionalLayer(nof_features,
                                           kernel_size=ksize,
                                           acti_func=self.acti_func,
-                                          with_bias=True,
-                                          with_bn=self.with_bn,
-                                          name=name)
+                                          name=name,
+                                          **self.base_layer_params)
             else:
-                nof_features = nof_channels*(self.upsample_factor**2)
+                nof_features = nof_channels*(self.upsample_factor**nof_dims)
                 conv = ConvolutionalLayer(nof_features,
                                           kernel_size=ksize,
                                           acti_func=None,
-                                          with_bias=True,
-                                          with_bn=self.with_bn,
-                                          name=name)
+                                          name=name,
+                                          **self.base_layer_params)
 
             features = conv(features, is_training=is_training,
                             keep_prob=keep_prob)
@@ -85,8 +89,13 @@ class SubPixelCNNLayer(TrainableLayer):
             + [nof_channels]
 
         print('in shape = ', lr_images.shape.as_list())
+        print('out ftrs = ', features.shape.as_list())
         print('out shape = ', output_shape)
 
-        return tf.contrib.periodic_resample.periodic_resample(features,
-                                                              output_shape,
-                                                              name='shuffle')
+        shuffled = tf.contrib.periodic_resample.periodic_resample(features,
+                                                                  output_shape,
+                                                                  name='shuffle')
+
+        print('shuffled = ', shuffled)
+
+        return shuffled
