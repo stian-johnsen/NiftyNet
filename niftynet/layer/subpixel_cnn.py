@@ -40,13 +40,16 @@ class SubPixelCNNLayer(TrainableLayer):
 
         if layer_configurations[-1][1] != -1:
             raise ValueError('The size of the last feature map must be -1')
+        if upsample_factor <= 0:
+            raise ValueError('The upsampling factor must be strictly positive.')
 
         self.upsample_factor = upsample_factor
         self.layer_configurations = layer_configurations
         self.acti_func = acti_func
 
-        self.base_layer_params = {'with_bias': True,
+        self.cnn_layer_params = {'with_bias': True,
                                   'with_bn': with_bn,
+                                  'padding': 'SAME',
                                   'w_initializer': w_initializer,
                                   'b_initializer': b_initializer,
                                   'w_regularizer': w_regularizer,
@@ -72,30 +75,25 @@ class SubPixelCNNLayer(TrainableLayer):
                                           kernel_size=ksize,
                                           acti_func=self.acti_func,
                                           name=name,
-                                          **self.base_layer_params)
+                                          **self.cnn_layer_params)
             else:
-                nof_features = nof_channels*(self.upsample_factor**nof_dims)
+                nof_features = nof_channels*self.upsample_factor**nof_dims
                 conv = ConvolutionalLayer(nof_features,
                                           kernel_size=ksize,
                                           acti_func=None,
                                           name=name,
-                                          **self.base_layer_params)
+                                          **self.cnn_layer_params)
 
             features = conv(features, is_training=is_training,
                             keep_prob=keep_prob)
 
+        # Setting the number of output features to the known value
+        # obtained from the input shape results in a ValueError as
+        # TF 1.12
         output_shape = [batch_size] \
             + [self.upsample_factor*i for i in input_shape[:-1]] \
-            + [nof_channels]
+            + [None]
 
-        print('in shape = ', lr_images.shape.as_list())
-        print('out ftrs = ', features.shape.as_list())
-        print('out shape = ', output_shape)
-
-        shuffled = tf.contrib.periodic_resample.periodic_resample(features,
-                                                                  output_shape,
-                                                                  name='shuffle')
-
-        print('shuffled = ', shuffled)
-
-        return shuffled
+        return tf.contrib.periodic_resample.periodic_resample(features,
+                                                              output_shape,
+                                                              name='shuffle')
