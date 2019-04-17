@@ -23,7 +23,8 @@ class SubPixelCNNLayer(TrainableLayer):
                                        (3, 32),
                                        (3, -1)),
                  acti_func='tanh',
-                 with_bn=True,
+                 with_bn=False,
+                 padding='REFLECT',
                  w_initializer=None,
                  w_regularizer=None,
                  b_initializer=None,
@@ -34,6 +35,7 @@ class SubPixelCNNLayer(TrainableLayer):
         :param layer_configurations: N pairs consisting of a kernel size and
         a feature-map size, where N is the number of layers in the net. The last
         layer must have a feature-map size of -1.
+        :param padding: padding applied in convolutional layers
         """
 
         super(SubPixelCNNLayer, self).__init__(name=name)
@@ -47,9 +49,9 @@ class SubPixelCNNLayer(TrainableLayer):
         self.layer_configurations = layer_configurations
         self.acti_func = acti_func
 
-        self.cnn_layer_params = {'with_bias': True,
+        self.conv_layer_params = {'with_bias': True,
                                   'with_bn': with_bn,
-                                  'padding': 'SAME',
+                                  'padding': padding,
                                   'w_initializer': w_initializer,
                                   'b_initializer': b_initializer,
                                   'w_regularizer': w_regularizer,
@@ -61,6 +63,8 @@ class SubPixelCNNLayer(TrainableLayer):
         input_shape = input_shape[1:]
         nof_dims = len(input_shape) - 1
 
+        if batch_size is None:
+            raise ValueError('The batch size must be known and fixed.')
         if any(i is None or i <= 0 for i in input_shape):
             raise ValueError('The image shape must be known in advance.')
 
@@ -89,7 +93,7 @@ class SubPixelCNNLayer(TrainableLayer):
 
         # Setting the number of output features to the known value
         # obtained from the input shape results in a ValueError as
-        # TF 1.12
+        # of TF 1.12
         output_shape = [batch_size] \
             + [self.upsample_factor*i for i in input_shape[:-1]] \
             + [None]
