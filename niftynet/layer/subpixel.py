@@ -7,7 +7,7 @@ from niftynet.layer import layer_util
 from niftynet.layer.base_layer import TrainableLayer
 from niftynet.layer.convolution import ConvolutionalLayer
 
-class SubPixelCNNLayer(TrainableLayer):
+class SubPixelLayer(TrainableLayer):
     """
     Implementation of Shi et al.'s sub-pixel CNN single-image
     upsampling method.
@@ -38,7 +38,7 @@ class SubPixelCNNLayer(TrainableLayer):
         :param padding: padding applied in convolutional layers
         """
 
-        super(SubPixelCNNLayer, self).__init__(name=name)
+        super(SubPixelLayer, self).__init__(name=name)
 
         if layer_configurations[-1][1] != -1:
             raise ValueError('The size of the last feature map must be -1')
@@ -79,14 +79,14 @@ class SubPixelCNNLayer(TrainableLayer):
                                           kernel_size=ksize,
                                           acti_func=self.acti_func,
                                           name=name,
-                                          **self.cnn_layer_params)
+                                          **self.conv_layer_params)
             else:
                 nof_features = nof_channels*self.upsample_factor**nof_dims
                 conv = ConvolutionalLayer(nof_features,
                                           kernel_size=ksize,
                                           acti_func=None,
                                           name=name,
-                                          **self.cnn_layer_params)
+                                          **self.conv_layer_params)
 
             features = conv(features, is_training=is_training,
                             keep_prob=keep_prob)
