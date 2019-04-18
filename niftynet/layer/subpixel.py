@@ -24,6 +24,7 @@ class SubPixelLayer(TrainableLayer):
                                        (3, -1)),
                  acti_func='tanh',
                  with_bn=False,
+                 with_bias=True,
                  padding='REFLECT',
                  w_initializer=None,
                  w_regularizer=None,
@@ -36,6 +37,9 @@ class SubPixelLayer(TrainableLayer):
         a feature-map size, where N is the number of layers in the net. The last
         layer must have a feature-map size of -1.
         :param padding: padding applied in convolutional layers
+        :param with_bias: incorporate bias parameters in convolutional layers
+        :param with_bn: incorporate batch normalisation in convolutional layers
+        :param acti_func: activation function applied to first N - 1 layers
         """
 
         super(SubPixelLayer, self).__init__(name=name)
@@ -49,7 +53,7 @@ class SubPixelLayer(TrainableLayer):
         self.layer_configurations = layer_configurations
         self.acti_func = acti_func
 
-        self.conv_layer_params = {'with_bias': True,
+        self.conv_layer_params = {'with_bias': with_bias,
                                   'with_bn': with_bn,
                                   'padding': padding,
                                   'w_initializer': w_initializer,
