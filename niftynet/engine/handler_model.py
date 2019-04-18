@@ -37,10 +37,12 @@ class ModelRestorer(object):
                  initial_iter=0,
                  is_training_action=True,
                  vars_to_restore=None,
+                 use_saved_model=False,
                  **_unused):
         self.initial_iter = initial_iter
         self.vars_to_restore = vars_to_restore
         self.file_name_prefix = make_model_name(model_dir)
+        self.use_saved_model = use_saved_model
         # randomly initialise or restoring model
         if is_training_action and initial_iter == 0:
             SESS_STARTED.connect(self.rand_init_model)
@@ -104,20 +106,26 @@ class ModelRestorer(object):
             tf.get_default_session().run(init_op)
 
 
-        try:
-            saver = tf.train.Saver(
-                var_list=to_restore, save_relative_paths=True)
-            saver.restore(tf.get_default_session(), checkpoint)
-        except tf.errors.NotFoundError:
-            tf.logging.fatal(
-                'checkpoint %s not found or variables to restore do not '
-                'match the current application graph', checkpoint)
-            dir_name = os.path.dirname(checkpoint)
-            if dir_name and not os.path.exists(dir_name):
+        if self.use_saved_model:
+            if not tf.saved_model.maybe_saved_model_directory(checkpoint):
+                raise ValueError('No saved model at the specified location')
+
+            
+        else:
+            try:
+                saver = tf.train.Saver(
+                    var_list=to_restore, save_relative_paths=True)
+                saver.restore(tf.get_default_session(), checkpoint)
+            except tf.errors.NotFoundError:
                 tf.logging.fatal(
-                    "Model folder not found %s, please check"
-                    "config parameter: model_dir", dir_name)
-            raise
+                    'checkpoint %s not found or variables to restore do not '
+                    'match the current application graph', checkpoint)
+                dir_name = os.path.dirname(checkpoint)
+                if dir_name and not os.path.exists(dir_name):
+                    tf.logging.fatal(
+                        "Model folder not found %s, please check"
+                        "config parameter: model_dir", dir_name)
+                raise
 
 
 class ModelSaver(object):
