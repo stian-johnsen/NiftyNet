@@ -23,6 +23,6 @@ class RGBHistogramEquilisationLayer(Layer):
         cv2 = require_module('cv2')
 
         hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        hsv_image[...:0] = cv2.equalizeHist(hsv_image[...,0])
+        hsv_image[...,0] = cv2.equalizeHist(hsv_image[...,0])
 
         return cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
