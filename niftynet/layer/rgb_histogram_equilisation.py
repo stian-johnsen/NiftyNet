@@ -6,8 +6,8 @@ from niftynet.utilities.util_import import require_module
 class RGBHistogramEquilisationLayer(Layer):
     """
     RGB histogram equilisation. Unlike the multi-modality general
-    histogram normalisation this is done conventionally, on an
-    individual image basis. This function requires OpenCV
+    histogram normalisation this is done conventionally, on a
+    per-image basis. This layer requires OpenCV.
     """
 
     def layer_op(self, image):
