@@ -54,4 +54,4 @@ class RGBHistogramEquilisationLayer(Layer):
 
             return image, mask
         else:
-            self._normalise_image(image), mask
+            return self._normalise_image(image), mask
