@@ -112,6 +112,7 @@ class SegmentationApplication(BaseApplication):
             if (self.net_param.histogram_ref_file and
                 self.net_param.normalisation) else None
         rgb_normaliser = RGBHistogramEquilisationLayer(
+            image_name='image',
             name='rbg_norm_layer') if self.net_param.rgb_normalisation else None
         label_normalisers = None
         if self.net_param.histogram_ref_file and \
