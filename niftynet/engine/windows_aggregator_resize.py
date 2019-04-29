@@ -59,8 +59,10 @@ class ResizeSamplesAggregator(ImageWindowsAggregator):
             if self.output_callback is None:
                 self._save_current_image(window[batch_id, ...], resize_to_shape)
             else:
-                self.output_callback(self._finalise_image(window[batch_id, ...],
-                                                          resize_to_shape))
+                self.output_callback(
+                    self._finalise_image(
+                        window[batch_id, ...], resize_to_shape),
+                    self.reader.get_subject_id(self.image_id))
         return True
 
     def _initialise_image_shape(self, image_id, n_channels):

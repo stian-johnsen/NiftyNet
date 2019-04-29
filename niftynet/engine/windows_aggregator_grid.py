@@ -61,7 +61,9 @@ class GridSamplesAggregator(ImageWindowsAggregator):
                     self._save_current_image()
                 else:
                     self._finalise_image()
-                    self.output_callback(self.image_out)
+                    self.output_callback(
+                        self.image_out,
+                        self.reader.get_subject_id(self.image_id))
                 if self._is_stopping_signal(location[batch_id]):
                     return False
                 self.image_out = self._initialise_empty_image(
