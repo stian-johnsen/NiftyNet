@@ -397,7 +397,7 @@ The relevant configuration parameters are:
 
 These parameters are ignored and whitening is disabled if `whitening=False`.
 
-(3) Setting `rgb_normalisation=True` enables RGB histogram equilisation.
+(3) Setting `rgb_normalisation=True` enables RGB histogram equilisation. Requires OpenCV (opencv-python) and only supports 2D images.
 
 More specifically:
 
