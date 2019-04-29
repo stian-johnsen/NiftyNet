@@ -378,7 +378,7 @@ def add_network_args(parser):
         default=False)
 
     parser.add_argument(
-        "--rgb-normalisation",
+        "--rgb_normalisation",
         help="Indicates if RGB histogram equilisation should be performed",
         type=str2boolean,
         default=False)
