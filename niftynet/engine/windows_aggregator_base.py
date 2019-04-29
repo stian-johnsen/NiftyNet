@@ -20,12 +20,16 @@ class ImageWindowsAggregator(object):
     information the reader is needed.
     """
 
-    def __init__(self, image_reader=None, output_path='.'):
+    def __init__(self,
+                 image_reader=None,
+                 output_path='.',
+                 output_callback=None):
         self.reader = image_reader
         self._image_id = None
         self.postfix = ''
         self.output_path = os.path.abspath(output_path)
         self.inferred_cleared = False
+        self.output_callback = output_callback
 
     @property
     def input_image(self):

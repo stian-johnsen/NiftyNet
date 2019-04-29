@@ -29,9 +29,17 @@ class GridSamplesAggregator(ImageWindowsAggregator):
                  window_border=(),
                  interp_order=0,
                  postfix='_niftynet_out',
+                 output_callback=None,
                  fill_constant=0.0):
+        """
+        :param output_callback: a callback function for in-memory output of
+        result images
+        """
         ImageWindowsAggregator.__init__(
-            self, image_reader=image_reader, output_path=output_path)
+            self,
+            image_reader=image_reader,
+            output_path=output_path,
+            output_callback=output_callback)
         self.name = name
         self.image_out = None
         self.window_border = window_border
@@ -49,7 +57,11 @@ class GridSamplesAggregator(ImageWindowsAggregator):
             if image_id != self.image_id:
                 # image name changed:
                 #    save current image and create an empty image
-                self._save_current_image()
+                if self.output_callback is None:
+                    self._save_current_image()
+                else:
+                    self._finalise_image()
+                    self.output_callback(self.image_out)
                 if self._is_stopping_signal(location[batch_id]):
                     return False
                 self.image_out = self._initialise_empty_image(
@@ -76,15 +88,23 @@ class GridSamplesAggregator(ImageWindowsAggregator):
 
         return empty_image
 
-    def _save_current_image(self):
-        if self.input_image is None:
-            return
+    def _finalise_image(self):
+        """
+        Applies any required post-processing ops to the output image.
+        """
 
         for layer in reversed(self.reader.preprocessors):
             if isinstance(layer, PadLayer):
                 self.image_out, _ = layer.inverse_op(self.image_out)
             if isinstance(layer, DiscreteLabelNormalisationLayer):
                 self.image_out, _ = layer.inverse_op(self.image_out)
+
+
+    def _save_current_image(self):
+        if self.input_image is None:
+            return
+
+        self._finalise_image()
         subject_name = self.reader.get_subject_id(self.image_id)
         filename = "{}{}.nii.gz".format(subject_name, self.postfix)
         source_image_obj = self.input_image[self.name]

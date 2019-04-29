@@ -28,9 +28,13 @@ class ResizeSamplesAggregator(ImageWindowsAggregator):
                  output_path=os.path.join('.', 'output'),
                  window_border=(),
                  interp_order=0,
-                 postfix='_niftynet_out'):
+                 postfix='_niftynet_out',
+                 output_callback=None):
         ImageWindowsAggregator.__init__(
-            self, image_reader=image_reader, output_path=output_path)
+            self,
+            image_reader=image_reader,
+            output_path=output_path,
+            output_callback=output_callback)
         self.name = name
         self.window_border = window_border
         self.output_interp_order = interp_order
@@ -52,7 +56,11 @@ class ResizeSamplesAggregator(ImageWindowsAggregator):
             resize_to_shape = self._initialise_image_shape(
                 image_id=self.image_id,
                 n_channels=window.shape[-1])
-            self._save_current_image(window[batch_id, ...], resize_to_shape)
+            if self.output_callback is None:
+                self._save_current_image(window[batch_id, ...], resize_to_shape)
+            else:
+                self.output_callback(self._finalise_image(window[batch_id, ...],
+                                                          resize_to_shape))
         return True
 
     def _initialise_image_shape(self, image_id, n_channels):
@@ -65,9 +73,7 @@ class ResizeSamplesAggregator(ImageWindowsAggregator):
                 empty_image, _ = layer(empty_image)
         return empty_image.shape
 
-    def _save_current_image(self, image_out, resize_to):
-        if self.input_image is None:
-            return
+    def _finalise_image(self, image_out, resize_to):
         window_shape = resize_to
         while image_out.ndim < 5:
             image_out = image_out[..., np.newaxis, :]
@@ -91,6 +97,14 @@ class ResizeSamplesAggregator(ImageWindowsAggregator):
                 image_out, _ = layer.inverse_op(image_out)
             if isinstance(layer, DiscreteLabelNormalisationLayer):
                 image_out, _ = layer.inverse_op(image_out)
+
+        return image_out
+
+    def _save_current_image(self, image_out, resize_to):
+        if self.input_image is None:
+            return
+
+        image_out = self._finalise_image(image_out, resize_to)
         subject_name = self.reader.get_subject_id(self.image_id)
         filename = "{}{}.nii.gz".format(subject_name, self.postfix)
         source_image_obj = self.input_image[self.name]
