@@ -127,14 +127,30 @@ class RGBEquilisationTest(tf.test.TestCase):
 
         hist_before = _get_histogram(IMAGE_DATA)
 
-        layer = RGBHistogramEquilisationLayer()
-        img = layer(IMAGE_DATA)
+        layer = RGBHistogramEquilisationLayer(image_name='image')
+        orig_shape = list(IMAGE_DATA.shape)
+        input_shape = orig_shape[:2] + [1]*2 + [3]
+        img, _ = layer(IMAGE_DATA.reshape(input_shape))
 
-        hist_after = _get_histogram(img)
+        hist_after = _get_histogram(img.reshape(orig_shape))
 
         self.assertGreater(hist_before.astype(np.float32).std(),
                            hist_after.astype(np.float32).std())
 
+        img, _ = layer({'image': IMAGE_DATA.reshape(input_shape)})
+
+        hist_after = _get_histogram(img['image'].reshape(orig_shape))
+
+        self.assertGreater(hist_before.astype(np.float32).std(),
+                           hist_after.astype(np.float32).std())
+
+        img = (255*IMAGE_DATA).astype(np.uint8)
+        img, _ = layer({'image': IMAGE_DATA.reshape(input_shape)})
+
+        hist_after = _get_histogram(img['image'].reshape(orig_shape))
+
+        self.assertGreater(hist_before.astype(np.float32).std(),
+                           hist_after.astype(np.float32).std())
 
 
 if __name__ == "__main__":
