@@ -1,109 +1,23 @@
 # -*- coding: utf-8 -*-
-"""This module loads images from csv files and outputs numpy arrays."""
-from __future__ import absolute_import, division, print_function
+"""
+Image F/S output module
+"""
+from __future__ import absolute_import
 
-from abc import ABCMeta, abstractmethod, abstractproperty
-import argparse
 from copy import deepcopy
 import numpy as np
-import pandas
-import tensorflow as tf
 from six import string_types
 
-from niftynet.io.misc_io import dtype_casting
 from niftynet.io.image_sets_partitioner import COLUMN_UNIQ_ID
-from niftynet.io.image_type import ImageFactory
-from niftynet.layer.base_layer import Layer, DataDependentLayer, RandomisedLayer
-from niftynet.utilities.user_parameters_helper import make_input_tuple
-from niftynet.utilities.util_common import print_progress_bar, ParserNamespace
 from niftynet.io.image_sets_partitioner import ImageSetsPartitioner
-from niftynet.utilities.util_common import look_up_operations
+from niftynet.io.image_source_base import ImageSourceBase, \
+    param_to_dict, \
+    infer_tf_dtypes
+from niftynet.layer.base_layer import Layer, RandomisedLayer
+from niftynet.utilities.user_parameters_helper import make_input_tuple
+from niftynet.utilities.util_common import print_progress_bar
 
-DEFAULT_INTERP_ORDER = 1
-SUPPORTED_DATA_SPEC = {
-    'csv_file', 'path_to_search',
-    'filename_contains', 'filename_not_contains', 'filename_removefromid',
-    'interp_order', 'loader', 'pixdim', 'axcodes', 'spatial_window_size'}
-
-
-def infer_tf_dtypes(image_array):
-    """
-    Choosing a suitable tf dtype based on the dtype of input numpy array.
-    """
-    return dtype_casting(
-        image_array.dtype[0], image_array.interp_order[0], as_tf=True)
-
-
-class ImageSourceBase(Layer):
-    """
-    Base class for F/S image reader and other image-input sources.
-    """
-
-    __metaclass__ = ABCMeta
-
-    def __init__(self, names=None, name='image_source'):
-        self._spatial_ranks = None
-        self._shapes = None
-        self._dtypes = None
-        self._names = None
-        if names:
-            self.names = names
-
-        # list of image objects
-        self.output_list = None
-        self.current_id = -1
-
-        self.preprocessors = []
-        super(ImageSourceBase, self).__init__(name='image_reader')
-
-    def prepare_preprocessors(self):
-        """
-        Some preprocessors requires an initial step to initialise
-        data dependent internal parameters.
-
-        This function find these preprocessors and run the initialisations.
-        """
-        for layer in self.preprocessors:
-            if isinstance(layer, DataDependentLayer):
-                layer.train(self.output_list)
-
-    def add_preprocessing_layers(self, layers):
-        """
-        Adding a ``niftynet.layer`` or a list of layers as preprocessing steps.
-        """
-        assert self.output_list is not None, \
-            'Please initialise the reader first, ' \
-            'before adding preprocessors.'
-        if isinstance(layers, Layer):
-            self.preprocessors.append(layers)
-        else:
-            self.preprocessors.extend(layers)
-        self.prepare_preprocessors()
-
-    @abstractproperty
-    def spatial_ranks(self):
-        """
-        :return: the shapes of the images in the collections provided
-        by this source.
-        """
-
-        return
-
-    @abstractproperty
-    def names(self):
-        """
-        :return: 
-        """
-
-        return
-
-    @abstractproperty
-    def num_subjects(self):
-        """
-        :return the total number of subjects across the collections.
-        """
-
-        return
+import tensorflow as tf
 
 class ImageReader(ImageSourceBase):
     """
@@ -138,7 +52,6 @@ class ImageReader(ImageSourceBase):
         # list of file names
         self._file_list = None
         self._input_sources = None
-        self._spatial_ranks = None
         self._shapes = None
         self._dtypes = None
         self._names = None
@@ -298,61 +211,40 @@ class ImageReader(ImageSourceBase):
                 # print('%s, %.3f sec'%(layer, -local_time + time.time()))
         return idx, image_data_dict, interp_order_dict
 
-    @property
-    def spatial_ranks(self):
+    def _check_initialised(self):
         """
-        Number of spatial dimensions of the images.
+        Checks if the reader has been initialised, if not raises a RuntimeError
+        """
 
-        :return: integers of spatial rank
-        """
         if not self.output_list:
             tf.logging.fatal("Please initialise the reader first.")
             raise RuntimeError
-        if not self._spatial_ranks:
-            first_image = self.output_list[0]
-            self._spatial_ranks = {field: first_image[field].spatial_rank
-                                   for field in self.names}
-        return self._spatial_ranks
 
-    @property
-    def shapes(self):
-        """
-        Image shapes before any preprocessing.
+    def _load_spatial_ranks(self):
+        self._check_initialised()
 
-        :return: tuple of integers as image shape
+        first_image = self.output_list[0]
 
+        return {field: first_image[field].spatial_rank
+                for field in self.names}
 
-        .. caution::
+    def _load_shapes(self):
+        self._check_initialised()
 
-            To have fast access, the spatial dimensions are not accurate
+        first_image = self.output_list[0]
+        return {field: first_image[field].shape
+                for field in self.names}
 
-                1. only read from the first image in list
-                2. not considering effects of random augmentation layers
-                    but time and modality dimensions should be correct
-        """
-        if not self.output_list:
-            tf.logging.fatal("Please initialise the reader first.")
-            raise RuntimeError
-        if not self._shapes:
-            first_image = self.output_list[0]
-            self._shapes = {field: first_image[field].shape
-                            for field in self.names}
-        return self._shapes
-
-    @property
-    def tf_dtypes(self):
+    def _load_dtypes(self):
         """
         Infer input data dtypes in TF
         (using the first image in the file list).
         """
-        if not self.output_list:
-            tf.logging.fatal("Please initialise the reader first.")
-            raise RuntimeError
-        if not self._dtypes:
-            first_image = self.output_list[0]
-            self._dtypes = {field: infer_tf_dtypes(first_image[field])
-                            for field in self.names}
-        return self._dtypes
+        self._check_initialised()
+
+        first_image = self.output_list[0]
+        return {field: infer_tf_dtypes(first_image[field])
+                for field in self.names}
 
     @property
     def input_sources(self):
@@ -366,9 +258,8 @@ class ImageReader(ImageSourceBase):
         map task parameter keywords ``image`` and ``label`` to
         section names ``T1``, ``T2``, and ``manual_map`` respectively.
         """
-        if not self._input_sources:
-            tf.logging.fatal("Please initialise the reader first.")
-            raise RuntimeError
+        self._check_initialised()
+
         return self._input_sources
 
     @property
@@ -428,22 +319,6 @@ class ImageReader(ImageSourceBase):
         except (KeyError, AttributeError):
             tf.logging.warning('Unknown subject id in reader file list.')
             raise
-
-
-"""
-In-memory image passing support module
-"""
-
-class CallbackImageReader(Layer):
-    """
-    This class acts as a compatibility layer between a callback
-    function yielding ID-data tuples and code expecting an ImageReader
-    layer.
-    """
-
-    def __init__(self,
-                 input_callback_function):
-        super(CallbackImageReader, self).__init__()
 
 
 def _filename_to_image_list(file_list, mod_dict, data_param):
@@ -531,35 +406,3 @@ def _create_image(file_list, idx, modalities, data_param):
                         'output_axcodes': axcodes,
                         'loader': loader}
     return ImageFactory.create_instance(**image_properties)
-
-
-def param_to_dict(input_data_param):
-    """
-    Validate the user input ``input_data_param``
-    raise an error if it's invalid.
-
-    :param input_data_param:
-    :return: input data specifications as a nested dictionary
-    """
-    error_msg = 'Unknown ``data_param`` type. ' \
-                'It should be a nested dictionary: '\
-                '{"modality_name": {"input_property": value}} '\
-                'or a dictionary of: {"modality_name": '\
-                'niftynet.utilities.util_common.ParserNamespace}'
-    data_param = deepcopy(input_data_param)
-    if isinstance(data_param, (ParserNamespace, argparse.Namespace)):
-        data_param = vars(data_param)
-    if not isinstance(data_param, dict):
-        raise ValueError(error_msg)
-    for mod in data_param:
-        mod_param = data_param[mod]
-        if isinstance(mod_param, (ParserNamespace, argparse.Namespace)):
-            dict_param = vars(mod_param)
-        elif isinstance(mod_param, dict):
-            dict_param = mod_param
-        else:
-            raise ValueError(error_msg)
-        for data_key in dict_param:
-            look_up_operations(data_key, SUPPORTED_DATA_SPEC)
-        data_param[mod] = dict_param
-    return data_param
