@@ -37,6 +37,7 @@ class ImageSinkBase(Layer):
 
         return self._source
 
+    # pylint: disable=arguments-differ
     @abstractmethod
     def layer_op(self, image_data_out, image_id, image_data_in):
         """
