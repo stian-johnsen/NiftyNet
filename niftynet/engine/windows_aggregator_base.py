@@ -32,7 +32,6 @@ class ImageWindowsAggregator(object):
         self.reader = image_reader
         self.writer = image_writer
         self._image_id = None
-        self.inferred_cleared = False
 
     @property
     def input_image(self):
