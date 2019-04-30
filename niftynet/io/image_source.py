@@ -2,9 +2,9 @@
 """This module loads images from csv files and outputs numpy arrays."""
 from __future__ import absolute_import, division, print_function
 
-from copy import deepcopy
-
+from abc import ABCMeta, abstractmethod, abstractproperty
 import argparse
+from copy import deepcopy
 import numpy as np
 import pandas
 import tensorflow as tf
@@ -34,7 +34,78 @@ def infer_tf_dtypes(image_array):
         image_array.dtype[0], image_array.interp_order[0], as_tf=True)
 
 
-class ImageReader(Layer):
+class ImageSourceBase(Layer):
+    """
+    Base class for F/S image reader and other image-input sources.
+    """
+
+    __metaclass__ = ABCMeta
+
+    def __init__(self, names=None, name='image_source'):
+        self._spatial_ranks = None
+        self._shapes = None
+        self._dtypes = None
+        self._names = None
+        if names:
+            self.names = names
+
+        # list of image objects
+        self.output_list = None
+        self.current_id = -1
+
+        self.preprocessors = []
+        super(ImageSourceBase, self).__init__(name='image_reader')
+
+    def prepare_preprocessors(self):
+        """
+        Some preprocessors requires an initial step to initialise
+        data dependent internal parameters.
+
+        This function find these preprocessors and run the initialisations.
+        """
+        for layer in self.preprocessors:
+            if isinstance(layer, DataDependentLayer):
+                layer.train(self.output_list)
+
+    def add_preprocessing_layers(self, layers):
+        """
+        Adding a ``niftynet.layer`` or a list of layers as preprocessing steps.
+        """
+        assert self.output_list is not None, \
+            'Please initialise the reader first, ' \
+            'before adding preprocessors.'
+        if isinstance(layers, Layer):
+            self.preprocessors.append(layers)
+        else:
+            self.preprocessors.extend(layers)
+        self.prepare_preprocessors()
+
+    @abstractproperty
+    def spatial_ranks(self):
+        """
+        :return: the shapes of the images in the collections provided
+        by this source.
+        """
+
+        return
+
+    @abstractproperty
+    def names(self):
+        """
+        :return: 
+        """
+
+        return
+
+    @abstractproperty
+    def num_subjects(self):
+        """
+        :return the total number of subjects across the collections.
+        """
+
+        return
+
+class ImageReader(ImageSourceBase):
     """
     For a concrete example::
 
@@ -177,30 +248,6 @@ class ImageReader(Layer):
                 'from sections %s as input [%s]',
                 len(self.output_list), self.input_sources[name], name)
         return self
-
-    def prepare_preprocessors(self):
-        """
-        Some preprocessors requires an initial step to initialise
-        data dependent internal parameters.
-
-        This function find these preprocessors and run the initialisations.
-        """
-        for layer in self.preprocessors:
-            if isinstance(layer, DataDependentLayer):
-                layer.train(self.output_list)
-
-    def add_preprocessing_layers(self, layers):
-        """
-        Adding a ``niftynet.layer`` or a list of layers as preprocessing steps.
-        """
-        assert self.output_list is not None, \
-            'Please initialise the reader first, ' \
-            'before adding preprocessors.'
-        if isinstance(layers, Layer):
-            self.preprocessors.append(layers)
-        else:
-            self.preprocessors.extend(layers)
-        self.prepare_preprocessors()
 
     # pylint: disable=arguments-differ,too-many-branches
     def layer_op(self, idx=None, shuffle=True):
@@ -381,6 +428,22 @@ class ImageReader(Layer):
         except (KeyError, AttributeError):
             tf.logging.warning('Unknown subject id in reader file list.')
             raise
+
+
+"""
+In-memory image passing support module
+"""
+
+class CallbackImageReader(Layer):
+    """
+    This class acts as a compatibility layer between a callback
+    function yielding ID-data tuples and code expecting an ImageReader
+    layer.
+    """
+
+    def __init__(self,
+                 input_callback_function):
+        super(CallbackImageReader, self).__init__()
 
 
 def _filename_to_image_list(file_list, mod_dict, data_param):
