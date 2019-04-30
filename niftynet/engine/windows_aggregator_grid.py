@@ -24,14 +24,14 @@ class GridSamplesAggregator(ImageWindowsAggregator):
     """
     def __init__(self,
                  image_reader,
+                 output_writer,
                  name='image',
-                 output_path=os.path.join('.', 'output'),
                  window_border=(),
-                 interp_order=0,
-                 postfix='_niftynet_out',
                  fill_constant=0.0):
         ImageWindowsAggregator.__init__(
-            self, image_reader=image_reader, output_path=output_path)
+            self,
+            image_reader=image_reader,
+            image_writer)
         self.name = name
         self.image_out = None
         self.window_border = window_border
