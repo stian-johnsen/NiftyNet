@@ -56,7 +56,7 @@ class ClassifierSamplesAggregator(ImageWindowsAggregator):
             image_writer = _CSVWriterDecorator(image_writer)
 
         ImageWindowsAggregator.__init__(
-            self, image_reader, image_writer)
+            self, image_reader, image_writer, name=name)
         self.name = name
         self.output_interp_order = 0
 
