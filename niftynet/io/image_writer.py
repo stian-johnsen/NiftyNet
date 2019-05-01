@@ -58,7 +58,13 @@ class ImageWriter(ImageWriterBase):
 
         self._output_path = os.path.abspath(output_path)
         self._postfix = postfix
-        self.inferred_cleared = False
+        self.inferred_csv = os.path.join(self.output_path, 'inferred.csv')
+
+        if not os.path.exists(self.output_path):
+            os.makedirs(self.output_path)
+
+        if os.path.exists(self.inferred_csv):
+            os.remove(self.inferred_csv)
 
     @property
     def output_path(self):
@@ -68,10 +74,9 @@ class ImageWriter(ImageWriterBase):
     def postfix(self):
         return self._postfix
 
-    def layer_op(self, image_data_out, image_id, image_data_in):
+    def layer_op(self, image_data_out, subject_name, image_data_in):
         image_data_out = self._invert_preprocessing(image_data_out)
 
-        subject_name = self.source.get_subject_id(image_id)
         filename = "{}{}.nii.gz".format(subject_name, self.postfix)
         misc_io.save_data_array(self.output_path,
                                 filename,
@@ -88,14 +93,7 @@ class ImageWriter(ImageWriterBase):
         :param filename: filename of output
         :return:
         """
-        inferred_csv = os.path.join(self.output_path, 'inferred.csv')
-        if not self.inferred_cleared:
-            if os.path.exists(inferred_csv):
-                os.remove(inferred_csv)
-            self.inferred_cleared = True
-            if not os.path.exists(self.output_path):
-                os.makedirs(self.output_path)
-        with open(inferred_csv, 'a+') as csv_file:
+        with open(self.inferred_csv, 'a+') as csv_file:
             filename = os.path.join(self.output_path, filename)
             csv_file.write('{},{}\n'.format(subject_name, filename))
 

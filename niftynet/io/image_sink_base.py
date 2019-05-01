@@ -55,10 +55,11 @@ class ImageSinkBase(Layer):
 
     # pylint: disable=arguments-differ
     @abstractmethod
-    def layer_op(self, image_data_out, image_id, image_data_in):
+    def layer_op(self, image_data_out, subject_name, image_data_in):
         """
         :param image_data_out: the voxel data to output
-        :param image_id: the ID associated with the data
+        :param subject_name: a unique identifier for the subject for which
+        the output was generated.
         :param image_data_in: the image object from which the output
         was generated
         """

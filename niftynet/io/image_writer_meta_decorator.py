@@ -5,9 +5,8 @@ output meta-data to the F/S outputs of ImageWriter
 """
 from __future__ import absolute_import
 
-import os
-
 from niftynet.io.image_writer import ImageWriterBase
+
 
 class ImageWriterDecorator(ImageWriterBase):
     """
@@ -42,5 +41,5 @@ class ImageWriterDecorator(ImageWriterBase):
         return self.base_writer.postfix
 
     # pylint: disable=arguments-differ
-    def layer_op(self, image_out, image_id, image_in):
-        self.base_writer(image_out, image_id, image_in)
+    def layer_op(self, image_out, subject_id, image_in):
+        self.base_writer(image_out, subject_id, image_in)
