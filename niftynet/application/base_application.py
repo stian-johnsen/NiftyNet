@@ -9,6 +9,7 @@ import tensorflow as tf
 from six import with_metaclass
 
 from niftynet.engine.signal import TRAIN, INFER, EVAL
+from niftynet.io.image_writer import ImageWriter
 
 APP_INSTANCE = None  # global so it can be reset
 
@@ -58,6 +59,9 @@ class BaseApplication(with_metaclass(SingletonApplication, object)):
     readers = None
     sampler = None
 
+    # output writers
+    writers = None
+
     # the network
     net = None
 
@@ -69,6 +73,11 @@ class BaseApplication(with_metaclass(SingletonApplication, object)):
     output_decoder = None
     outputs_collector = None
     gradients_collector = None
+
+    def __init__(self):
+        self.action_param = None
+        self.net_param = None
+        self.data_param = None
 
     def initialise_dataset_loader(
             self, data_param=None, task_param=None, data_partitioner=None):
@@ -82,6 +91,16 @@ class BaseApplication(with_metaclass(SingletonApplication, object)):
         :return:
         """
         raise NotImplementedError
+
+    #pylint: disable=unused-argument
+    def initialise_output(self, data_param=None, task_param=None):
+        """
+        Configures the image sinks of the application that handle
+        the output of the application results.
+        :param data_param: data parameters
+        :param task_param: task parameters
+        """
+        self.writers = [self._configure_fs_writer()]
 
     def initialise_sampler(self):
         """
@@ -122,6 +141,21 @@ class BaseApplication(with_metaclass(SingletonApplication, object)):
             False indicates the drive should stop
         """
         raise NotImplementedError
+
+    def _configure_fs_writer(self):
+        """
+        Configures an ImageWriter instance using parameters read
+        from self.action_param.
+
+        This action can only be performed after the image source
+        has been configured.
+
+        :return: an ImageWriter instance for F/S output of results
+        """
+        return ImageWriter(self.readers[0],
+                           self.action_param.output_interp_order,
+                           self.action_param.save_seg_dir,
+                           self.action_param.output_postfix)
 
     def add_inferred_output_like(self, data_param, task_param, name):
         """ This function adds entries to parameter objects to enable

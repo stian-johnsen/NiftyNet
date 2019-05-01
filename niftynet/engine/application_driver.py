@@ -165,6 +165,7 @@ class ApplicationDriver(object):
         # initialise readers
         self.app.initialise_dataset_loader(
             data_param, app_param, self.data_partitioner)
+        self.app.initialise_output(data_param, app_param)
 
         # make the list of initialised event handler instances.
         self.load_event_handlers(
