@@ -7,6 +7,9 @@ from __future__ import absolute_import
 from abc import ABCMeta, abstractmethod
 
 from niftynet.layer.base_layer import Layer
+from niftynet.layer.pad import PadLayer
+from niftynet.layer.discrete_label_normalisation import \
+    DiscreteLabelNormalisationLayer
 
 class ImageSinkBase(Layer):
     """
@@ -36,6 +39,19 @@ class ImageSinkBase(Layer):
         """
 
         return self._source
+
+    def _invert_preprocessing(self, image_out):
+        """
+        Applies the inverse of the pre-processing operations
+        applied by the image source.
+        :param image_out: the aggregated output samples as a image tensor.
+        """
+
+        for layer in reversed(self.source.preprocessors):
+            if isinstance(layer, PadLayer):
+                image_out, _ = layer.inverse_op(image_out)
+            if isinstance(layer, DiscreteLabelNormalisationLayer):
+                image_out, _ = layer.inverse_op(image_out)
 
     # pylint: disable=arguments-differ
     @abstractmethod
