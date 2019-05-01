@@ -258,7 +258,7 @@ class GANApplication(BaseApplication):
 
             self.output_decoder = WindowAsImageAggregator(
                 image_reader=self.readers[0],
-                output_path=self.action_param.save_seg_dir)
+                image_writer=self.writers[0])
 
     def interpret_output(self, batch_output):
         if self.is_training:
