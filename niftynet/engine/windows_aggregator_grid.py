@@ -9,10 +9,7 @@ import os
 
 import numpy as np
 
-import niftynet.io.misc_io as misc_io
 from niftynet.engine.windows_aggregator_base import ImageWindowsAggregator
-from niftynet.layer.discrete_label_normalisation import \
-    DiscreteLabelNormalisationLayer
 from niftynet.layer.pad import PadLayer
 
 
@@ -79,10 +76,5 @@ class GridSamplesAggregator(ImageWindowsAggregator):
         if self.input_image is None:
             return
 
-        for layer in reversed(self.reader.preprocessors):
-            if isinstance(layer, PadLayer):
-                self.image_out, _ = layer.inverse_op(self.image_out)
-            if isinstance(layer, DiscreteLabelNormalisationLayer):
-                self.image_out, _ = layer.inverse_op(self.image_out)
-
-        self.writer(self.image_out, self.image_id, self.input_image[self.name])
+        output_name = self.reader.get_subject_id(self.image_id)
+        self.writer(self.image_out, output_name, self.input_image[self.name])
