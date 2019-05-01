@@ -4,11 +4,11 @@ from __future__ import absolute_import, division, print_function
 
 from abc import ABCMeta, abstractmethod, abstractproperty
 import argparse
+from copy import deepcopy
 import tensorflow as tf
 
 from niftynet.io.misc_io import dtype_casting
-from niftynet.io.image_type import ImageFactory
-from niftynet.layer.base_layer import Layer, DataDependentLayer
+from niftynet.layer.base_layer import Layer
 from niftynet.utilities.user_parameters_helper import make_input_tuple
 from niftynet.utilities.util_common import print_progress_bar, ParserNamespace
 from niftynet.io.image_sets_partitioner import ImageSetsPartitioner
@@ -19,7 +19,6 @@ SUPPORTED_DATA_SPEC = {
     'csv_file', 'path_to_search',
     'filename_contains', 'filename_not_contains', 'filename_removefromid',
     'interp_order', 'loader', 'pixdim', 'axcodes', 'spatial_window_size'}
-
 
 def infer_tf_dtypes(image_array):
     """
@@ -36,44 +35,15 @@ class ImageSourceBase(Layer):
 
     __metaclass__ = ABCMeta
 
-    def __init__(self, names=None, name='image_source'):
+    def __init__(self, name='image_source'):
         self._spatial_ranks = None
         self._shapes = None
         self._dtypes = None
-        self._names = None
-        if names:
-            self.names = names
 
-        # list of image objects
-        self.output_list = None
         self.current_id = -1
 
         self.preprocessors = []
         super(ImageSourceBase, self).__init__(name='image_reader')
-
-    def prepare_preprocessors(self):
-        """
-        Some preprocessors requires an initial step to initialise
-        data dependent internal parameters.
-
-        This function find these preprocessors and run the initialisations.
-        """
-        for layer in self.preprocessors:
-            if isinstance(layer, DataDependentLayer):
-                layer.train(self.output_list)
-
-    def add_preprocessing_layers(self, layers):
-        """
-        Adding a ``niftynet.layer`` or a list of layers as preprocessing steps.
-        """
-        assert self.output_list is not None, \
-            'Please initialise the reader first, ' \
-            'before adding preprocessors.'
-        if isinstance(layers, Layer):
-            self.preprocessors.append(layers)
-        else:
-            self.preprocessors.extend(layers)
-        self.prepare_preprocessors()
 
     @abstractmethod
     def _load_spatial_ranks(self):
@@ -177,6 +147,7 @@ class ImageSourceBase(Layer):
         :return: an int with the file list index
         """
         return
+
 
 def param_to_dict(input_data_param):
     """

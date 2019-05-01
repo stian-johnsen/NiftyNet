@@ -7,17 +7,19 @@ from __future__ import absolute_import
 from copy import deepcopy
 import numpy as np
 from six import string_types
+import pandas
+import tensorflow as tf
 
 from niftynet.io.image_sets_partitioner import COLUMN_UNIQ_ID
 from niftynet.io.image_sets_partitioner import ImageSetsPartitioner
 from niftynet.io.image_source_base import ImageSourceBase, \
     param_to_dict, \
-    infer_tf_dtypes
-from niftynet.layer.base_layer import Layer, RandomisedLayer
+    infer_tf_dtypes, \
+    DEFAULT_INTERP_ORDER
+from niftynet.io.image_type import ImageFactory
+from niftynet.layer.base_layer import Layer, DataDependentLayer, RandomisedLayer
 from niftynet.utilities.user_parameters_helper import make_input_tuple
 from niftynet.utilities.util_common import print_progress_bar
-
-import tensorflow as tf
 
 class ImageReader(ImageSourceBase):
     """
@@ -52,17 +54,11 @@ class ImageReader(ImageSourceBase):
         # list of file names
         self._file_list = None
         self._input_sources = None
-        self._shapes = None
-        self._dtypes = None
         self._names = None
         if names:
             self.names = names
-
-        # list of image objects
         self.output_list = None
-        self.current_id = -1
 
-        self.preprocessors = []
         super(ImageReader, self).__init__(name='image_reader')
 
     def initialise(self, data_param, task_param=None, file_list=None):
@@ -161,6 +157,30 @@ class ImageReader(ImageSourceBase):
                 'from sections %s as input [%s]',
                 len(self.output_list), self.input_sources[name], name)
         return self
+
+    def prepare_preprocessors(self):
+        """
+        Some preprocessors requires an initial step to initialise
+        data dependent internal parameters.
+
+        This function find these preprocessors and run the initialisations.
+        """
+        for layer in self.preprocessors:
+            if isinstance(layer, DataDependentLayer):
+                layer.train(self.output_list)
+
+    def add_preprocessing_layers(self, layers):
+        """
+        Adding a ``niftynet.layer`` or a list of layers as preprocessing steps.
+        """
+        assert self.output_list is not None, \
+            'Please initialise the reader first, ' \
+            'before adding preprocessors.'
+        if isinstance(layers, Layer):
+            self.preprocessors.append(layers)
+        else:
+            self.preprocessors.extend(layers)
+        self.prepare_preprocessors()
 
     # pylint: disable=arguments-differ,too-many-branches
     def layer_op(self, idx=None, shuffle=True):
@@ -319,7 +339,6 @@ class ImageReader(ImageSourceBase):
         except (KeyError, AttributeError):
             tf.logging.warning('Unknown subject id in reader file list.')
             raise
-
 
 def _filename_to_image_list(file_list, mod_dict, data_param):
     """
