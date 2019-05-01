@@ -19,8 +19,9 @@ class ImageWriterBase(ImageSinkBase):
 
     def __init__(self,
                  reader,
+                 interp_order=-1,
                  name='image_writer_base'):
-        super(ImageWriterBase, self).__init__(reader, name=name)
+        super(ImageWriterBase, self).__init__(reader, interp_order, name=name)
 
     @abstractproperty
     def output_path(self):
@@ -48,13 +49,14 @@ class ImageWriter(ImageWriterBase):
                  source,
                  interp_order,
                  output_path='.',
-                 postfix='_niftynet_out'):
+                 postfix='_niftynet_out',
+                 name='image_writer'):
         """
         :param output_path: output directory
         :param postfix: filename postfix applied to images
         """
 
-        super(ImageWriter, self).__init__(source, interp_order)
+        super(ImageWriter, self).__init__(source, interp_order, name=name)
 
         self._output_path = os.path.abspath(output_path)
         self._postfix = postfix

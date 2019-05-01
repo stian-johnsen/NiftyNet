@@ -234,19 +234,16 @@ class SegmentationApplication(BaseApplication):
     def initialise_grid_aggregator(self):
         self.output_decoder = GridSamplesAggregator(
             image_reader=self.readers[0],
-            output_path=self.action_param.save_seg_dir,
+            image_writer=self.writers[0],
             window_border=self.action_param.border,
-            interp_order=self.action_param.output_interp_order,
-            postfix=self.action_param.output_postfix,
             fill_constant=self.action_param.fill_constant)
 
     def initialise_resize_aggregator(self):
         self.output_decoder = ResizeSamplesAggregator(
             image_reader=self.readers[0],
-            output_path=self.action_param.save_seg_dir,
+            image_writer=self.writers[0],
             window_border=self.action_param.border,
-            interp_order=self.action_param.output_interp_order,
-            postfix=self.action_param.output_postfix)
+            interp_order=self.action_param.output_interp_order)
 
     def initialise_sampler(self):
         if self.is_training:

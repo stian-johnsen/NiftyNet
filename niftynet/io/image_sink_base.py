@@ -53,6 +53,8 @@ class ImageSinkBase(Layer):
             if isinstance(layer, DiscreteLabelNormalisationLayer):
                 image_out, _ = layer.inverse_op(image_out)
 
+        return image_out
+
     # pylint: disable=arguments-differ
     @abstractmethod
     def layer_op(self, image_data_out, subject_name, image_data_in):
