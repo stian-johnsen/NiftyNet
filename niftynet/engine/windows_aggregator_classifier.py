@@ -13,8 +13,7 @@ import niftynet.io.misc_io as misc_io
 from niftynet.io.image_writer import ImageWriterBase
 from niftynet.io.image_writer_meta_decorator import ImageWriterDecorator
 from niftynet.engine.windows_aggregator_base import ImageWindowsAggregator
-from niftynet.layer.discrete_label_normalisation import \
-    DiscreteLabelNormalisationLayer
+
 
 class _CSVWriterDecorator(ImageWriterDecorator):
     """
