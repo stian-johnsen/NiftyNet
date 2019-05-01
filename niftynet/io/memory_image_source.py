@@ -16,8 +16,8 @@ class MemoryImageSource(ImageSourceBase):
                  input_callback_functions,
                  num_subjects):
         """
-        :param input_callback_function: a dict of functions
-        that for a given index an yield an image tensor and where
+        :param input_callback_dicts: a dict of function, interpolation order
+        tuples that for a given index an yield an image tensor and where
         the keys are the image collection names.
         :param num_subjects: number of subjects/defines the valid index range
         """
