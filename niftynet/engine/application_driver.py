@@ -162,10 +162,11 @@ class ApplicationDriver(object):
                     system_param.dataset_split_file,
                     train_param.exclude_fraction_for_validation)
 
-        # initialise readers
+        # initialise readers and writers
         self.app.initialise_dataset_loader(
             data_param, app_param, self.data_partitioner)
-        self.app.initialise_output(data_param, app_param)
+        if not self.is_training_action:
+            self.app.initialise_output()
 
         # make the list of initialised event handler instances.
         self.load_event_handlers(
