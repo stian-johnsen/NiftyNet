@@ -292,8 +292,8 @@ class RegApp(BaseApplication):
 
             self.output_decoder = ResizeSamplesAggregator(
                 image_reader=self.readers[0], # fixed image reader
+                image_writer=self.writers[0],
                 name='fixed_image',
-                output_path=self.action_param.save_seg_dir,
                 interp_order=self.action_param.output_interp_order)
 
     def interpret_output(self, batch_output):
