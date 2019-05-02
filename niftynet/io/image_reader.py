@@ -210,7 +210,7 @@ class ImageReader(ImageSourceBase):
             elif isinstance(layer, Layer):
                 image_data_dict, mask = layer(image_data_dict, mask)
                 # print('%s, %.3f sec'%(layer, -local_time + time.time()))
-        return idx, image_data_dict, interp_order_dict
+        return image_data_dict, interp_order_dict
 
     def _check_initialised(self):
         """
