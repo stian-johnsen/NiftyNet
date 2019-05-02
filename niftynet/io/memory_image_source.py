@@ -44,4 +44,12 @@ class MemoryImageSource(ImageSourceBase):
     def get_image_index(self, subject_id):
         return int(subject_id)
 
-    def layer_op
+    def _get_image_and_interp_dict(self, idx):
+        image_data, interps = ({}, {})
+
+        for name, funct in self._input_callback_functions:
+            data, interp = funct(idx)
+            image_data[name] = data
+            interps[name] = interp
+
+        return image_data, interps

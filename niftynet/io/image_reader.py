@@ -182,25 +182,7 @@ class ImageReader(ImageSourceBase):
             self.preprocessors.extend(layers)
         self.prepare_preprocessors()
 
-    # pylint: disable=arguments-differ,too-many-branches
-    def layer_op(self, idx=None, shuffle=True):
-        """
-        this layer returns dictionaries::
-
-            keys: self.output_fields
-            values: image volume array
-
-        """
-        if idx is None:
-            if shuffle:
-                # training, with random list output
-                idx = np.random.randint(len(self.output_list))
-            else:
-                # testing, with sequential output
-                # accessing self.current_id, not suitable for multi-thread
-                idx = self.current_id + 1
-                self.current_id = idx
-
+    def _get_image_and_interp_dict(self, idx):
         try:
             image_dict = self.output_list[idx]
         except (IndexError, TypeError):
