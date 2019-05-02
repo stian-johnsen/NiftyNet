@@ -51,6 +51,7 @@ class ImageReader(ImageSourceBase):
     """
 
     def __init__(self, names=None):
+        super(ImageReader, self).__init__(name='image_reader')
         # list of file names
         self._file_list = None
         self._input_sources = None
@@ -58,8 +59,6 @@ class ImageReader(ImageSourceBase):
         if names:
             self.names = names
         self.output_list = None
-
-        super(ImageReader, self).__init__(name='image_reader')
 
     def initialise(self, data_param, task_param=None, file_list=None):
         """

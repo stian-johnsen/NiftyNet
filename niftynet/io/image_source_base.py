@@ -10,8 +10,7 @@ import tensorflow as tf
 
 from niftynet.io.misc_io import dtype_casting
 from niftynet.layer.base_layer import Layer
-from niftynet.utilities.user_parameters_helper import make_input_tuple
-from niftynet.utilities.util_common import print_progress_bar, ParserNamespace
+from niftynet.utilities.util_common import ParserNamespace
 from niftynet.io.image_sets_partitioner import ImageSetsPartitioner
 from niftynet.utilities.util_common import look_up_operations
 
