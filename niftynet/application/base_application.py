@@ -93,12 +93,10 @@ class BaseApplication(with_metaclass(SingletonApplication, object)):
         raise NotImplementedError
 
     #pylint: disable=unused-argument
-    def initialise_output(self, data_param=None, task_param=None):
+    def initialise_output(self):
         """
         Configures the image sinks of the application that handle
-        the output of the application results.
-        :param data_param: data parameters
-        :param task_param: task parameters
+        the output of the inference results.
         """
         self.writers = [self._configure_fs_writer()]
 
