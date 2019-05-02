@@ -14,7 +14,8 @@ class MemoryImageSource(ImageSourceBase):
 
     def __init__(self,
                  input_callback_functions,
-                 num_subjects):
+                 num_subjects,
+                 name='memory_image_source'):
         """
         :param input_callback_dicts: a dict of function, interpolation order
         tuples that for a given index an yield an image tensor and where
@@ -42,3 +43,5 @@ class MemoryImageSource(ImageSourceBase):
 
     def get_image_index(self, subject_id):
         return int(subject_id)
+
+    def layer_op
