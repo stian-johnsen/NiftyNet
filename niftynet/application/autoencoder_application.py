@@ -34,7 +34,8 @@ class AutoencoderApplication(BaseApplication):
         self.autoencoder_param = None
 
     def initialise_dataset_loader(
-            self, data_param=None, task_param=None, data_partitioner=None):
+            self, data_param=None, task_param=None, factory=None):
+        self.endpoint_factory = factory
         self.data_param = data_param
         self.autoencoder_param = task_param
 
@@ -53,20 +54,19 @@ class AutoencoderApplication(BaseApplication):
         if self.is_evaluation:
             NotImplementedError('Evaluation is not yet '
                                 'supported in this application.')
-        if self.is_training:
+
+        if self._infer_type == 'sample' and not self.is_training:
             self.readers = []
-            for file_list in file_lists:
-                reader = ImageReader(['image'])
-                reader.initialise(data_param, task_param, file_list)
-                self.readers.append(reader)
-        if self._infer_type in ('encode', 'encode-decode'):
-            self.readers = [ImageReader(['image'])]
-            self.readers[0].initialise(data_param, task_param, file_lists[0])
-        elif self._infer_type == 'sample':
-            self.readers = []
-        elif self._infer_type == 'linear_interpolation':
-            self.readers = [ImageReader(['feature'])]
-            self.readers[0].initialise(data_param, task_param, file_lists[0])
+        else:
+            if self.is_training \
+               or self._infer_type in ('encode', 'encode-decode'):
+                reader_names = ['image']
+            elif self._infer_type == 'linear_interpolation':
+                reader_names = ['feature']
+
+            self.readers = self.endpoint_factory.create_sources(
+                reader_names, reader_phase, self.action)
+
         # if self.is_training or self._infer_type in ('encode', 'encode-decode'):
         #    mean_var_normaliser = MeanVarNormalisationLayer(image_name='image')
         #    self.reader.add_preprocessing_layers([mean_var_normaliser])

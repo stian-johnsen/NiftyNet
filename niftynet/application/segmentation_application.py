@@ -44,7 +44,6 @@ class SegmentationApplication(BaseApplication):
         self.net_param = net_param
         self.action_param = action_param
 
-        self.data_param = None
         self.segmentation_param = None
         self.SUPPORTED_SAMPLING = {
             'uniform': (self.initialise_uniform_sampler,
@@ -62,10 +61,11 @@ class SegmentationApplication(BaseApplication):
         }
 
     def initialise_dataset_loader(
-            self, data_param=None, task_param=None, data_partitioner=None):
+            self, data_param=None, task_param=None, factory=None):
 
         self.data_param = data_param
         self.segmentation_param = task_param
+        self.endpoint_factory = factory
 
         # initialise input image readers
         if self.is_training:
@@ -84,11 +84,8 @@ class SegmentationApplication(BaseApplication):
             reader_phase = self.action_param.dataset_to_infer
         except AttributeError:
             reader_phase = None
-        file_lists = data_partitioner.get_file_lists_by(
-            phase=reader_phase, action=self.action)
-        self.readers = [
-            ImageReader(reader_names).initialise(
-                data_param, task_param, file_list) for file_list in file_lists]
+        self.readers = factory.create_sources(
+            reader_names, reader_phase, self.action)
 
         # initialise input preprocessing layers
         foreground_masking_layer = BinaryMaskingLayer(

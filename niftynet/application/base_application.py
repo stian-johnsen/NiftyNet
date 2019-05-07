@@ -78,16 +78,17 @@ class BaseApplication(with_metaclass(SingletonApplication, object)):
         self.action_param = None
         self.net_param = None
         self.data_param = None
+        self.endpoint_factory = None
 
     def initialise_dataset_loader(
-            self, data_param=None, task_param=None, data_partitioner=None):
+            self, data_param=None, task_param=None, factory=None):
         """
         this function initialise self.readers
 
         :param data_param: input modality specifications
         :param task_param: contains task keywords for grouping data_param
-        :param data_partitioner:
-                           specifies train/valid/infer splitting if needed
+        :param factory: image end-point factory providing the partitioner,
+        and image source and sink instances.
         :return:
         """
         raise NotImplementedError

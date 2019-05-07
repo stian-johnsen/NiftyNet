@@ -60,8 +60,9 @@ class RegressionApplication(BaseApplication):
         }
 
     def initialise_dataset_loader(
-            self, data_param=None, task_param=None, data_partitioner=None):
+            self, data_param=None, task_param=None, factory=None):
 
+        self.endpoint_factory = factory
         self.data_param = data_param
         self.regression_param = task_param
 
@@ -82,11 +83,8 @@ class RegressionApplication(BaseApplication):
             reader_phase = self.action_param.dataset_to_infer
         except AttributeError:
             reader_phase = None
-        file_lists = data_partitioner.get_file_lists_by(
-            phase=reader_phase, action=self.action)
-        self.readers = [
-            ImageReader(reader_names).initialise(
-                data_param, task_param, file_list) for file_list in file_lists]
+        self.readers = self.endpoint_factory.create_sources(
+            reader_names, reader_phase, self.action)
 
         # initialise input preprocessing layers
         mean_var_normaliser = MeanVarNormalisationLayer(image_name='image') \
