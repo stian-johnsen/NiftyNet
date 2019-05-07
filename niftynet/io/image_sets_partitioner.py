@@ -7,11 +7,17 @@ subsets of ``Train``, ``Validation``, ``Inference``.
 """
 
 from abc import ABCMeta, abstractmethod
+import math
+import random
+
+import tensorflow as tf
 
 from niftynet.engine.signal import TRAIN, VALID, INFER, ALL
+from niftynet.utilities.util_common import look_up_operations
 
 SUPPORTED_PHASES = {TRAIN, VALID, INFER, ALL}
-
+COLUMN_UNIQ_ID = 'subject_id'
+COLUMN_PHASE = 'phase'
 
 class BaseImageSetsPartitioner(object):
     """
@@ -29,7 +35,8 @@ class BaseImageSetsPartitioner(object):
                    data_split_file=None,
                    ratios=None):
         """
-        :param num_subjects: number of subjects to partition
+        Set the data partitioner parameters
+
         :param new_partition: bool value indicating whether to generate new
             partition ids and overwrite csv file
             (this class will write partition file iff new_partition)
@@ -44,7 +51,69 @@ class BaseImageSetsPartitioner(object):
         self.data_param = data_param
 
     @abstractmethod
-    def get_image_lists_by(self, phase=ALL, action='train'):
+    def number_of_subjects(self):
+        """
+        query number of images according to phase.
+
+        :param phase: application phase; TRAIN, VALID, etc.
+        :return: number of subjects in partition
+        """
+
+        return
+
+    def _create_partitions(self):
+        """
+        Creates the subject partitions as linear array of application
+        phases, where each entry corresponds to a subject.
+        :return: a list of phases with one entry for every subject in
+        the data set.
+        """
+
+        if not self.ratios or self.number_of_subjects() <= 0:
+            raise RuntimeError('Called on an uninitialised partitioner.')
+
+        try:
+            valid_fraction, infer_fraction = self.ratios
+            valid_fraction = max(min(1.0, float(valid_fraction)), 0.0)
+            infer_fraction = max(min(1.0, float(infer_fraction)), 0.0)
+        except (TypeError, ValueError):
+            tf.logging.fatal(
+                'Unknown format of faction values %s', self.ratios)
+            raise
+
+        if (valid_fraction + infer_fraction) <= 0:
+            tf.logging.warning(
+                'To split dataset into training/validation, '
+                'please make sure '
+                '"exclude_fraction_for_validation" parameter is set to '
+                'a float in between 0 and 1. Current value: %s.',
+                valid_fraction)
+            # raise ValueError
+
+        n_total = self.number_of_subjects()
+        n_valid = int(math.ceil(n_total * valid_fraction))
+        n_infer = int(math.ceil(n_total * infer_fraction))
+        n_train = int(n_total - n_infer - n_valid)
+        phases = [TRAIN] * n_train + [VALID] * n_valid + [INFER] * n_infer
+        if len(phases) > n_total:
+            phases = phases[:n_total]
+        random.shuffle(phases)
+
+        return phases
+
+    def _look_up_phase(self, phase):
+        """
+        :return: the phase in canonical form
+        """
+
+        try:
+            return look_up_operations(phase.lower(), SUPPORTED_PHASES)
+        except (ValueError, AttributeError):
+            tf.logging.fatal('Unknown phase argument.')
+            raise
+
+    @abstractmethod
+    def get_image_lists_by(self, phase=None, action='train'):
         """
         Get file lists by action and phase.
 
@@ -62,17 +131,6 @@ class BaseImageSetsPartitioner(object):
         :param action: an action
         :param phase: an element from ``{TRAIN, VALID, INFER, ALL}``
         :return:
-        """
-
-        return
-
-    @abstractmethod
-    def instantiate_source(self, phase=ALL):
-        """
-        Instantiates a list of image sources for the given
-        phase in the application's life cycle.
-        :return: fully configured image sources that can be used
-        by applications for image input.
         """
 
         return

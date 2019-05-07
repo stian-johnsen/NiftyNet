@@ -7,9 +7,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import math
 import os
-import random
 import shutil
 
 import pandas
@@ -17,7 +15,9 @@ import tensorflow as tf  # to use the system level logging
 
 from niftynet.engine.signal import TRAIN, VALID, INFER, ALL
 from niftynet.io.image_sets_partitioner import BaseImageSetsPartitioner,\
-    SUPPORTED_PHASES
+    SUPPORTED_PHASES,\
+    COLUMN_UNIQ_ID,\
+    COLUMN_PHASE
 from niftynet.utilities.decorators import singleton
 from niftynet.utilities.filename_matching import KeywordsMatching
 from niftynet.utilities.niftynet_global_config import NiftyNetGlobalConfig
@@ -25,8 +25,6 @@ from niftynet.utilities.util_common import look_up_operations
 from niftynet.utilities.util_csv import match_and_write_filenames_to_csv
 from niftynet.utilities.util_csv import write_csv
 
-COLUMN_UNIQ_ID = 'subject_id'
-COLUMN_PHASE = 'phase'
 
 @singleton
 class FileImageSetsPartitioner(BaseImageSetsPartitioner):
@@ -57,19 +55,6 @@ class FileImageSetsPartitioner(BaseImageSetsPartitioner):
                    new_partition=False,
                    data_split_file=None,
                    ratios=None):
-        """
-        Set the data partitioner parameters
-
-        :param data_param: corresponding to all config sections
-        :param new_partition: bool value indicating whether to generate new
-            partition ids and overwrite csv file
-            (this class will write partition file iff new_partition)
-        :param data_split_file: location of the partition id file
-        :param ratios: a tuple/list with two elements:
-            ``(fraction of the validation set, fraction of the inference set)``
-            initialise to None will disable data partitioning
-            and get_file_list always returns all subjects.
-        """
         super(FileImageSetsPartitioner, self).initialise(
             data_param, new_partition, data_split_file, ratios)
 
@@ -88,19 +73,9 @@ class FileImageSetsPartitioner(BaseImageSetsPartitioner):
         return self
 
     def number_of_subjects(self, phase=ALL):
-        """
-        query number of images according to phase.
-
-        :param phase:
-        :return:
-        """
         if self._file_list is None:
             return 0
-        try:
-            phase = look_up_operations(phase.lower(), SUPPORTED_PHASES)
-        except (ValueError, AttributeError):
-            tf.logging.fatal('Unknown phase argument.')
-            raise
+        phase = self._look_up_phase(phase)
 
         if phase == ALL:
             return self._file_list[COLUMN_UNIQ_ID].count()
@@ -331,32 +306,7 @@ class FileImageSetsPartitioner(BaseImageSetsPartitioner):
         This function sets ``self._partition_ids``.
         """
         if overwrite:
-            try:
-                valid_fraction, infer_fraction = self.ratios
-                valid_fraction = max(min(1.0, float(valid_fraction)), 0.0)
-                infer_fraction = max(min(1.0, float(infer_fraction)), 0.0)
-            except (TypeError, ValueError):
-                tf.logging.fatal(
-                    'Unknown format of faction values %s', self.ratios)
-                raise
-
-            if (valid_fraction + infer_fraction) <= 0:
-                tf.logging.warning(
-                    'To split dataset into training/validation, '
-                    'please make sure '
-                    '"exclude_fraction_for_validation" parameter is set to '
-                    'a float in between 0 and 1. Current value: %s.',
-                    valid_fraction)
-                # raise ValueError
-
-            n_total = self.number_of_subjects()
-            n_valid = int(math.ceil(n_total * valid_fraction))
-            n_infer = int(math.ceil(n_total * infer_fraction))
-            n_train = int(n_total - n_infer - n_valid)
-            phases = [TRAIN] * n_train + [VALID] * n_valid + [INFER] * n_infer
-            if len(phases) > n_total:
-                phases = phases[:n_total]
-            random.shuffle(phases)
+            phases = self._create_partitions()
             write_csv(self.data_split_file,
                       zip(self._file_list[COLUMN_UNIQ_ID], phases))
         elif os.path.isfile(self.data_split_file):
@@ -481,7 +431,7 @@ class FileImageSetsPartitioner(BaseImageSetsPartitioner):
         """
         return self.get_file_list()
 
-    def get_file_lists_by(self, phase=None, action='train'):
+    def get_image_lists_by(self, phase=None, action='train'):
         """
         Get file lists by action and phase.
 
@@ -519,8 +469,6 @@ class FileImageSetsPartitioner(BaseImageSetsPartitioner):
 
         self._file_list = None
         self._partition_ids = None
-        self.data_param = None
-        self.ratios = None
         self.new_partition = False
 
         self.data_split_file = ""
