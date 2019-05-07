@@ -11,7 +11,7 @@ import pandas
 import tensorflow as tf
 
 from niftynet.io.image_sets_partitioner import COLUMN_UNIQ_ID
-from niftynet.io.image_sets_partitioner import ImageSetsPartitioner
+from niftynet.io.file_image_sets_partitioner import FileImageSetsPartitioner
 from niftynet.io.image_source_base import ImageSourceBase, \
     param_to_dict, \
     infer_tf_dtypes, \
@@ -107,7 +107,8 @@ class ImageReader(ImageSourceBase):
             raise
         if file_list is None:
             # defaulting to all files detected by the input specification
-            file_list = ImageSetsPartitioner().initialise(data_param).all_files
+            file_list = FileImageSetsPartitioner().initialise(data_param)\
+                                                  .all_files
         if not self.names:
             # defaulting to load all sections defined in the task_param
             self.names = list(task_param)
@@ -320,6 +321,7 @@ class ImageReader(ImageSourceBase):
         except (KeyError, AttributeError):
             tf.logging.warning('Unknown subject id in reader file list.')
             raise
+
 
 def _filename_to_image_list(file_list, mod_dict, data_param):
     """

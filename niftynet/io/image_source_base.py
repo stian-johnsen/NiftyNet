@@ -11,7 +11,6 @@ import tensorflow as tf
 from niftynet.io.misc_io import dtype_casting
 from niftynet.layer.base_layer import Layer
 from niftynet.utilities.util_common import ParserNamespace
-from niftynet.io.image_sets_partitioner import ImageSetsPartitioner
 from niftynet.utilities.util_common import look_up_operations
 
 DEFAULT_INTERP_ORDER = 1
