@@ -54,47 +54,33 @@ class ImageEndPointFactory(object):
         self._data_param = data_param
         self._task_param = task_param
 
-        if MEMORY_OUTPUT_CALLBACK_PARAM in data_param.__dict__ \
-           and MEMORY_INPUT_NUM_SUBJECTS_PARAM in data_param.__dict__ \
-           and MEMORY_INPUT_CALLBACK_PARAM in data_param.__dict__:
+        if not data_param is None \
+           and MEMORY_OUTPUT_CALLBACK_PARAM in data_param \
+           and MEMORY_INPUT_NUM_SUBJECTS_PARAM in data_param \
+           and MEMORY_INPUT_CALLBACK_PARAM in data_param:
             self._endpoint_type = ENDPOINT_MEMORY
         else:
             self._endpoint_type = ENDPOINT_FILESYSTEM
 
-    def create_partitioner(self,
-                           new_partition=False,
-                           data_split_file=None,
-                           ratios=None):
+    def create_partitioner(self):
         """
-        Instantiates and configures a new data-set partitioner
-        suitable for the image end-point type specified via
-        this factories parameters.
-
-        :param new_partition: boolean flag indicating whether to ignore any
-        existing partitioning and repartition the data set.
-        :param data_split_file: path to a CSV file containing the current
-        partitioning/destination path for the partitioning
-        :param ratios: data set split ratios
-        :return: a configured data-set partitioner
+        Instantiates a new data-set partitioner suitable for the image
+        end-point type specified via this factories parameters.
         """
 
-        if self._data_param is None or self._task_param is None:
+        if self._data_param is None and self._task_param is None:
             raise RuntimeError('Application parameters must be set before any'
                                ' data set can be partitioned.')
 
         if self._partioner is None:
             self._partitioner = self._partitioner_classes[self._endpoint_type]()
 
-           self._partitioner.initialise(new_partition=new_partition,
-                                        data_split_file=data_split_file,
-                                        ratios=ratios)
-
         return self._partitioner
 
-    def create_source(self, dataset_names, phase, action):
+    def create_sources(self, dataset_names, phase, action):
         """
-        Instantiates a source for the specified application phase
-        and data-set names
+        Instantiates a list of sources for the specified application phase
+        and data-set names.
         :param phase: an application life-cycle phase, e.g, TRAIN, VALID
         :param action: application action, e.g., TRAIN, INFER
         :param dataset_names: image collection/modality names
@@ -105,10 +91,8 @@ class ImageEndPointFactory(object):
             raise RuntimeError('Sources can only be instantiated after'
                                'data set partitioning')
 
-        source = self._source_classes[self._endpoint_type](dataset_names)
-        source.initialise(self._data_param,
-                          self._task_param,
-                          self._partitioner.get_image_lists_by(phase=phase,
-                                                               action=action))
+        return [self._source_classes[self._endpoint_type](dataset_names)
+                .initialise(self._data_param, self._task_param, subject_list)
+                for subject_list in self._partitioner.get_image_lists_by(
+                        phase=phase, action=action)]
 
-        return source
